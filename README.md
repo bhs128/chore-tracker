@@ -2,7 +2,7 @@
 
 A single-page, open-source household chore dashboard designed for always-on tablets and touch screens. Installable as a PWA for true offline kiosk mode.
 
-**[Live Demo →](https://YOUR_USERNAME.github.io/chore-tracker/)**
+**[Live Demo →](https://bhs128.github.io/chore-tracker/)**
 
 ## Features
 
@@ -24,55 +24,8 @@ A single-page, open-source household chore dashboard designed for always-on tabl
 - **Zero dependencies** — single HTML file, no build step, no frameworks
 - **Import / Export** — back up and restore data as JSON
 
-## Deployment
 
-### GitHub Pages (manual)
-
-1. Fork or clone this repo
-2. Go to **Settings → Pages**
-3. Set source to **Deploy from a branch**, select **main** branch, **/ (root)** folder
-4. Your dashboard is live at `https://<user>.github.io/chore-tracker/`
-
-### GitHub Pages (Actions workflow)
-
-If you prefer the newer Actions-based deployment, add `.github/workflows/deploy.yml`:
-
-```yaml
-name: Deploy to GitHub Pages
-
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
-
-jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: .
-      - id: deployment
-        uses: actions/deploy-pages@v4
-```
-
-Then go to **Settings → Pages** and set source to **GitHub Actions**.
-
-### Local / Kiosk
+### Local Deployment / Kiosk
 
 Just open `index.html` in any modern browser, or serve it locally:
 
