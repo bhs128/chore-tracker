@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1a1a2e">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/icon-16.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>Chore Tracker</title>
+
+<style>
+/* ── Self-hosted Poppins font ──────────────────────────────── */
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('fonts/poppins-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('fonts/poppins-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('fonts/poppins-700.woff2') format('woff2');
+}
+
+/* ── Reset & Base ──────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Theme variables ───────────────────────────────────────── */
+:root {
+  --bg:          #1a1a2e;
+  --text:        #e0e0e0;
+  --bar-bg:      #16213e;
+  --bar-border:  #0f3460;
+  --accent:      #3498db;
+  --btn-bg:      #0f3460;
+  --btn-border:  #1a3a6e;
+  --btn-hover:   #1a3a6e;
+  --cell-bg:     #222244;
+  --head-bg:     #16213e;
+  --head-text:   #aaa;
+  --today-bg:    #1e2a50;
+  --today-text:  #fff;
+  --chip-bg:     #222244;
+  --chip-sel-bg: #1a2e45;
+  --input-bg:    #222244;
+  --input-border:#333;
+  --desc-text:   #888;
+  --cycle-text:  #666;
+  --sep-color:   #0f3460;
+  --dialog-bg:   #1a1a2e;
+  --tooltip-bg:  #222244;
+  --future-bg:   #1e1e3a;
+  --future-text: #555;
+  --spark-sun:   rgba(255,255,255,0.12);
+  --spark-fill0: rgba(27,139,74,0.45);
+  --spark-fill1: rgba(27,139,74,0.05);
+  --spark-line:  #2ecc71;
+  --spark-red:   rgba(231,76,60,0.6);
+  --neutral-r:   58;
+  --neutral-g:   68;
+  --neutral-b:   80;
+}
+
+[data-theme="light"] {
+  --bg:          #f0f2f5;
+  --text:        #1a1a2e;
+  --bar-bg:      #ffffff;
+  --bar-border:  #d0d5dd;
+  --accent:      #2980b9;
+  --btn-bg:      #e8ecf1;
+  --btn-border:  #c0c8d4;
+  --btn-hover:   #d0d8e4;
+  --cell-bg:     #e4e7ec;
+  --head-bg:     #f7f8fa;
+  --head-text:   #555;
+  --today-bg:    #e0e6f0;
+  --today-text:  #1a1a2e;
+  --chip-bg:     #e4e7ec;
+  --chip-sel-bg: #d6e8f7;
+  --input-bg:    #ffffff;
+  --input-border:#c0c8d4;
+  --desc-text:   #777;
+  --cycle-text:  #999;
+  --sep-color:   #d0d5dd;
+  --dialog-bg:   #ffffff;
+  --tooltip-bg:  #ffffff;
+  --future-bg:   #eaecf0;
+  --future-text: #aaa;
+  --spark-sun:   rgba(0,0,0,0.08);
+  --spark-fill0: rgba(27,139,74,0.30);
+  --spark-fill1: rgba(27,139,74,0.03);
+  --spark-line:  #1b8b4a;
+  --spark-red:   rgba(200,50,40,0.5);
+  --neutral-r:   200;
+  --neutral-g:   200;
+  --neutral-b:   210;
+}
+
+html, body {
+  height: 100%; width: 100%;
+  overflow: hidden;
+  font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+  background: var(--bg); color: var(--text);
+  touch-action: manipulation;
+  -webkit-user-select: none; user-select: none;
+}
+
+/* ── Layout ────────────────────────────────────────────────── */
+#app {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
+  height: 100vh; width: 100vw;
+  gap: 0;
+}
+#top-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 5px 14px;
+  background: var(--bar-bg);
+  border-bottom: 1px solid var(--bar-border);
+  min-height: 44px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+#top-bar h1 { font-size: 1.25rem; font-weight: 700; color: var(--accent); letter-spacing: .5px; white-space: nowrap; }
+#top-bar .actions { display: flex; gap: 6px; flex-shrink: 0; }
+#top-bar button, dialog button {
+  background: var(--btn-bg); color: var(--text); border: 1px solid var(--btn-border);
+  padding: 5px 10px; border-radius: 6px; font-size: .78rem; cursor: pointer;
+  transition: background .15s; white-space: nowrap;
+}
+#top-bar button:hover, dialog button:hover { background: var(--btn-hover); }
+
+/* ── Top-bar sections ──────────────────────────────────────── */
+.tb-sep { width: 1px; height: 28px; background: var(--sep-color); flex-shrink: 0; }
+#user-section { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+#user-section .label { font-size: .7rem; color: var(--desc-text); white-space: nowrap; }
+#history-section {
+  display: flex; align-items: center; gap: 6px;
+  flex: 1; min-width: 0;
+}
+#history-section .label { font-size: .7rem; color: var(--desc-text); white-space: nowrap; }
+#history-summary { font-size: .68rem; color: var(--head-text); white-space: nowrap; flex-shrink: 0; }
+button.danger { background: #7a1a1a; border-color: #a33; color: #fff; }
+button.danger:hover { background: #a33; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary:hover { opacity: .85; }
+
+/* ── Main Table Area ───────────────────────────────────────── */
+#table-area {
+  overflow: auto;
+  padding: 10px;
+}
+#chore-table {
+  border-collapse: separate;
+  border-spacing: 2px;
+  width: 100%;
+  table-layout: fixed;
+}
+#chore-table th, #chore-table td {
+  text-align: center; padding: 6px 4px;
+  border-radius: 4px; font-size: .8rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#chore-table thead th {
+  background: var(--head-bg); color: var(--head-text); font-weight: 600;
+  position: sticky; top: 0; z-index: 2;
+}
+#chore-table thead th.today { color: var(--today-text); background: var(--today-bg); font-weight: 700; }
+#chore-table .col-today { box-shadow: inset 0 0 0 2px rgba(52,152,219,0.45); }
+#chore-table tbody th {
+  background: var(--head-bg); text-align: left; padding-left: 10px;
+  position: sticky; left: 0; z-index: 1; min-width: 240px; max-width: 300px;
+  cursor: pointer;
+}
+#chore-table tbody th .room-name { font-weight: 600; font-size: .85rem; }
+#chore-table tbody th .room-desc { font-weight: 400; font-size: .7rem; color: var(--desc-text); display: block; }
+#chore-table tbody th .room-cycle { font-weight: 400; font-size: .65rem; color: var(--cycle-text); display: block; }
+
+/* ── Cell States ───────────────────────────────────────────── */
+#chore-table td {
+  cursor: pointer; transition: background .12s, transform .1s;
+  min-width: 44px;           /* touch-friendly minimum */
+  height: 44px;
+  font-weight: 600; font-size: .75rem;
+}
+#chore-table td:active { transform: scale(.92); }
+td.cell-future  { background: var(--future-bg); color: var(--future-text); }
+
+/* ── Footer summary row ────────────────────────────────────── */
+#chore-table tfoot td {
+  font-size: .68rem; font-weight: 600; color: var(--head-text);
+  background: var(--head-bg); cursor: default; height: auto; min-width: 0;
+  position: sticky; bottom: 0; z-index: 2;
+}
+#chore-table tfoot td:active { transform: none; }
+#chore-table tfoot th {
+  background: var(--head-bg); text-align: left; padding-left: 10px;
+  font-size: .7rem; font-weight: 600; color: var(--head-text);
+  position: sticky; left: 0; bottom: 0; z-index: 3;
+}
+
+/* ── Row sort animation ────────────────────────────────────── */
+#chore-table tbody tr {
+  transition: transform .45s cubic-bezier(.4,0,.2,1);
+}
+
+/* ── User chips (top bar) ──────────────────────────────────── */
+#user-list {
+  display: flex; gap: 4px; align-items: center;
+}
+.user-chip {
+  padding: 4px 10px; border-radius: 14px;
+  background: var(--chip-bg); font-size: .75rem; cursor: pointer;
+  border: 2px solid transparent; transition: all .15s;
+  white-space: nowrap;
+}
+.user-chip.selected { border-color: var(--accent); background: var(--chip-sel-bg); color: var(--text); }
+/* user management in settings */
+#settings-user-list {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;
+}
+#settings-user-list .user-chip {
+  padding: 4px 10px; border-radius: 14px;
+  background: var(--chip-bg); font-size: .78rem; cursor: default;
+  border: 1px solid var(--input-border);
+}
+#settings-user-list .remove-user {
+  margin-left: 4px; color: var(--accent); font-size: .7rem; cursor: pointer;
+  font-weight: 700;
+}
+#add-user-settings {
+  display: flex; gap: 4px; margin-top: 6px;
+}
+#add-user-settings input {
+  flex: 1; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text);
+  padding: 5px 8px; border-radius: 6px; font-size: .82rem;
+}
+
+/* ── Sparkline history (top bar) ──────────────────────────── */
+#history-chart {
+  height: 28px; flex: 1; min-width: 60px; max-width: 220px;
+}
+
+/* ── Dialogs ───────────────────────────────────────────────── */
+dialog {
+  background: var(--dialog-bg); color: var(--text); border: 1px solid var(--bar-border);
+  border-radius: 10px; padding: 20px 24px; max-width: 420px; width: 90%;
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  margin: 0;
+}
+dialog::backdrop { background: rgba(0,0,0,.6); }
+dialog h3 { margin-bottom: 12px; color: var(--accent); }
+dialog label { display: block; margin: 8px 0 2px; font-size: .8rem; color: var(--head-text); }
+dialog input, dialog textarea, dialog select {
+  width: 100%; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text);
+  padding: 6px 10px; border-radius: 6px; font-size: .85rem;
+}
+dialog textarea { resize: vertical; min-height: 40px; }
+dialog .dialog-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+
+/* ── Tooltip (cell info) ───────────────────────────────────── */
+#cell-tooltip {
+  display: none; position: fixed; background: var(--tooltip-bg); color: var(--text);
+  border: 1px solid var(--bar-border); border-radius: 8px; padding: 8px 12px;
+  font-size: .75rem; z-index: 100; pointer-events: none; max-width: 200px;
+}
+
+/* ── Responsive tweaks for smaller tablets ─────────────────── */
+@media (max-width: 900px) {
+  #chore-table th, #chore-table td { font-size: .7rem; padding: 4px 2px; min-width: 36px; height: 36px; }
+  #history-section { display: none; }
+}
+@media (max-width: 600px) {
+  #top-bar { flex-wrap: wrap; gap: 6px; }
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- Top Bar -->
+  <header id="top-bar">
+    <h1><img src="icons/icon-32.png" alt="" width="20" height="20" style="vertical-align:-2px;margin-right:6px">Chore Tracker</h1>
+
+    <div class="tb-sep"></div>
+
+    <!-- User selector -->
+    <div id="user-section">
+      <span class="label">👤</span>
+      <div id="user-list"></div>
+    </div>
+
+    <div class="tb-sep"></div>
+
+    <!-- Sparkline history -->
+    <div id="history-section">
+      <span class="label" id="history-label">30-day History</span>
+      <canvas id="history-chart"></canvas>
+      <div id="history-summary"></div>
+    </div>
+
+    <div class="tb-sep"></div>
+
+    <div class="actions">
+      <button id="btn-add-room">+ Room</button>
+      <button id="btn-settings">⚙</button>
+    </div>
+  </header>
+
+  <!-- Main Table -->
+  <section id="table-area">
+    <table id="chore-table">
+      <thead id="table-head"></thead>
+      <tbody id="table-body"></tbody>
+      <tfoot id="table-foot"></tfoot>
+    </table>
+  </section>
+</div>
+
+<!-- Cell tooltip -->
+<div id="cell-tooltip"></div>
+
+<!-- Room dialog -->
+<dialog id="room-dialog">
+  <h3 id="room-dialog-title">Add Room</h3>
+  <label for="room-name">Room Name</label>
+  <input id="room-name" placeholder="e.g. Kitchen" maxlength="30">
+  <label for="room-desc">Description</label>
+  <textarea id="room-desc" placeholder="e.g. Wipe counters, sweep floor" maxlength="100"></textarea>
+  <label for="room-days">Stays clean for (days)</label>
+  <input id="room-days" type="number" min="1" max="30" value="3">
+  <div class="dialog-actions">
+    <button id="room-delete" class="danger" style="display:none">Delete</button>
+    <span style="flex:1"></span>
+    <button id="room-cancel">Cancel</button>
+    <button id="room-save" class="primary">Save</button>
+  </div>
+</dialog>
+
+<!-- Settings dialog -->
+<dialog id="settings-dialog">
+  <h3>Settings</h3>
+  <label for="settings-days-shown">Days shown in table</label>
+  <input id="settings-days-shown" type="number" min="5" max="60" value="14">
+  <label for="settings-history-days">History chart days</label>
+  <input id="settings-history-days" type="number" min="7" max="90" value="30">
+  <label for="settings-theme">Color theme</label>
+  <select id="settings-theme">
+    <option value="dark">Dark</option>
+    <option value="light">Light</option>
+  </select>
+  <label>Users</label>
+  <div id="settings-user-list"></div>
+  <div id="add-user-settings">
+    <input id="new-user-input" placeholder="Add user…" maxlength="20">
+    <button id="btn-add-user">+</button>
+  </div>
+  <div class="dialog-actions">
+    <button id="settings-export">Export JSON</button>
+    <button id="settings-import">Import JSON</button>
+    <input type="file" id="settings-import-file" accept=".json" style="display:none">
+    <span style="flex:1"></span>
+    <button id="settings-close">Close</button>
+    <button id="settings-save" class="primary">Save</button>
+  </div>
+</dialog>
+
+<script>
+/* ================================================================
+   Chore Tracker — Pure vanilla JS, all data in localStorage
+   ================================================================ */
+
+// ── Helpers ──────────────────────────────────────────────────
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const dateStr = d => d.toISOString().slice(0, 10);           // "YYYY-MM-DD"
+const today = () => dateStr(new Date());
+const addDays = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return dateStr(d); };
+const dayLabel = iso => { const d = new Date(iso + 'T12:00:00'); const wd = d.toLocaleDateString(undefined, { weekday: 'short' }); return `${wd} ${d.getMonth()+1}/${d.getDate()}`; };
+const uid = () => crypto.randomUUID?.() || Math.random().toString(36).slice(2, 10);
+
+// ── Data Model (persisted to localStorage) ───────────────────
+const STORAGE_KEY = 'chore-tracker-data';
+
+function defaultData() {
+  return {
+    rooms: [
+      { id: uid(), name: 'Kitchen',   desc: 'Wipe counters, sweep, dishes', cleanDays: 2 },
+      { id: uid(), name: 'Bathroom',  desc: 'Toilet, sink, mirror',         cleanDays: 3 },
+      { id: uid(), name: 'Living Room', desc: 'Vacuum, dust, tidy up',      cleanDays: 4 },
+    ],
+    users: ['Alice', 'Bob'],
+    // entries: { "YYYY-MM-DD": { roomId: { cleaned: true, user: "Alice" } } }
+    entries: {},
+    settings: { daysShown: 14, historyDays: 30 },
+    selectedUser: null,
+  };
+}
+
+let DATA;
+function load() {
+  try { DATA = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch {}
+  if (!DATA || !DATA.rooms) DATA = defaultData();
+  // Migration: ensure settings exist
+  if (!DATA.settings) DATA.settings = { daysShown: 14, historyDays: 30 };
+}
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }
+
+// ── Date Range ───────────────────────────────────────────────
+function visibleDates() {
+  const n = DATA.settings.daysShown || 14;
+  const t = today();
+  const dates = [];
+  // Center on today: roughly half past, half future
+  const futureDays = Math.floor(n / 2);
+  const pastDays = n - 1 - futureDays;
+  for (let i = -pastDays; i <= futureDays; i++) {
+    dates.push(addDays(t, i));
+  }
+  return dates;
+}
+
+// ── Cell state logic ─────────────────────────────────────────
+// Returns { state, daysSinceCleaned, daysOverdue, ratio } for colour gradient
+function cellInfo(room, date) {
+  const t = today();
+  if (date > t) {
+    // Future: project status forward from today's state
+    return cellInfoFuture(room, date);
+  }
+
+  // Was this room cleaned on this exact date?
+  const entry = DATA.entries[date]?.[room.id];
+  if (entry?.cleaned) return { state: 'cleaned', daysSince: 0, daysOverdue: 0, ratio: 0 };
+
+  // Find most recent cleaning on or before this date (search back up to 120d)
+  for (let i = 1; i <= 120; i++) {
+    const prev = addDays(date, -i);
+    if (DATA.entries[prev]?.[room.id]?.cleaned) {
+      const daysSince = i;
+      const daysOverdue = daysSince - room.cleanDays;
+      return {
+        state: daysOverdue >= 0 ? 'overdue' : 'clean',
+        daysSince,
+        daysOverdue: Math.max(0, daysOverdue),
+        ratio: daysSince / room.cleanDays   // 0→1 = green→neutral, >1 = red
+      };
+    }
+  }
+  // Never cleaned
+  return { state: 'overdue', daysSince: 999, daysOverdue: 999, ratio: 3 };
+}
+
+function cellInfoFuture(room, date) {
+  // Project forward: find the most recent cleaning on or before today
+  const t = today();
+  const daysFromToday = Math.round((new Date(date + 'T12:00:00') - new Date(t + 'T12:00:00')) / 86400000);
+  // Get today's info and add the future offset
+  for (let i = 0; i <= 120; i++) {
+    const prev = addDays(t, -i);
+    if (DATA.entries[prev]?.[room.id]?.cleaned) {
+      const daysSince = i + daysFromToday;
+      const daysOverdue = daysSince - room.cleanDays;
+      return {
+        state: daysOverdue >= 0 ? 'overdue' : 'clean',
+        daysSince,
+        daysOverdue: Math.max(0, daysOverdue),
+        ratio: daysSince / room.cleanDays,
+        future: true
+      };
+    }
+  }
+  return { state: 'overdue', daysSince: 999, daysOverdue: 999, ratio: 3, future: true };
+}
+
+// Keep old API for history chart
+function cellState(room, date) {
+  return cellInfo(room, date).state;
+}
+
+function cleanedBy(room, date) {
+  return DATA.entries[date]?.[room.id]?.user || null;
+}
+
+// ── Unique user prefixes ─────────────────────────────────────
+// Returns a map { userName: shortestUniquePrefix } so users with the same
+// first letter get enough characters to be distinguishable in the grid.
+function userPrefixes() {
+  const users = DATA.users;
+  const map = {};
+  for (const u of users) {
+    let len = 1;
+    while (len < u.length && users.some(o => o !== u && o.slice(0, len).toLowerCase() === u.slice(0, len).toLowerCase())) {
+      len++;
+    }
+    map[u] = u.slice(0, len).toUpperCase();
+  }
+  return map;
+}
+
+// ── Color gradient helper ────────────────────────────────────
+// ratio: 0 = just cleaned (bright green), 1 = due (neutral), >1 = overdue, ≥2 = bright red
+let _neutralCache = null;
+function getNeutral() {
+  if (_neutralCache) return _neutralCache;
+  const cs = getComputedStyle(document.documentElement);
+  _neutralCache = {
+    r: parseInt(cs.getPropertyValue('--neutral-r')) || 58,
+    g: parseInt(cs.getPropertyValue('--neutral-g')) || 68,
+    b: parseInt(cs.getPropertyValue('--neutral-b')) || 80
+  };
+  return _neutralCache;
+}
+function invalidateNeutralCache() { _neutralCache = null; }
+
+function cellColor(ratio, isFuture) {
+  const opacity = isFuture ? 0.55 : 1;
+  const n = getNeutral();
+  if (ratio <= 0) {
+    // Just cleaned: bright green
+    return `rgba(46,204,113,${opacity})`;
+  } else if (ratio < 1) {
+    // Clean window: lerp bright green → neutral
+    const t = ratio;
+    const r = Math.round(46 + (n.r - 46) * t);
+    const g = Math.round(204 + (n.g - 204) * t);
+    const b = Math.round(113 + (n.b - 113) * t);
+    return `rgba(${r},${g},${b},${opacity})`;
+  } else if (ratio < 2) {
+    // Overdue: lerp neutral → bright red
+    const t = ratio - 1;
+    const r = Math.round(n.r + (231 - n.r) * t);
+    const g = Math.round(n.g + (76 - n.g) * t);
+    const b = Math.round(n.b + (60 - n.b) * t);
+    return `rgba(${r},${g},${b},${opacity})`;
+  } else {
+    // Critically overdue (2x+): solid bright red
+    return `rgba(231,76,60,${opacity})`;
+  }
+}
+
+function cellTextColor(ratio) {
+  const light = document.documentElement.getAttribute('data-theme') === 'light';
+  if (light) return ratio < 0.6 ? '#1a3a1a' : ratio < 1.2 ? '#444' : '#5a1010';
+  return ratio < 0.6 ? '#fff' : ratio < 1.2 ? '#ccc' : '#ffcccc';
+}
+
+// ── Sort rooms by days-until-due (most urgent first) ─────────
+// daysUntilDue = cleanDays − daysSince. Negative = overdue. Ascending puts most overdue on top.
+function daysUntilDue(room) {
+  const info = cellInfo(room, today());
+  if (info.daysSince === 999) return -999;           // never cleaned → top
+  return room.cleanDays - (info.daysSince ?? 0);
+}
+function sortedRooms() {
+  return [...DATA.rooms].sort((a, b) => {
+    const da = daysUntilDue(a), db = daysUntilDue(b);
+    if (da !== db) return da - db;
+    return a.cleanDays - b.cleanDays;  // shorter cycle = dirtier → higher
+  });
+}
+
+// ── Render Table ─────────────────────────────────────────────
+function renderTable(animate) {
+  const dates = visibleDates();
+  const t = today();
+  const rooms = sortedRooms();
+  const prefixes = userPrefixes();
+
+  // Head — Room column uses colspan=3, day columns share the rest equally
+  const dayCols = dates.length;
+  let headHtml = `<colgroup><col><col><col>`;
+  for (let i = 0; i < dayCols; i++) headHtml += `<col>`;
+  headHtml += '</colgroup>';
+  headHtml += '<tr><th colspan=3>Room</th>';
+  for (const d of dates) {
+    const cls = d === t ? ' class="today"' : '';
+    headHtml += `<th${cls}>${dayLabel(d)}</th>`;
+  }
+  headHtml += '</tr>';
+  $('#table-head').innerHTML = headHtml;
+
+  // Capture old row positions for FLIP animation
+  const oldPositions = {};
+  if (animate) {
+    for (const tr of $('#table-body').querySelectorAll('tr[data-room-id]')) {
+      oldPositions[tr.dataset.roomId] = tr.getBoundingClientRect().top;
+    }
+  }
+
+  // Body
+  let bodyHtml = '';
+  for (const room of rooms) {
+    bodyHtml += `<tr data-room-id="${room.id}">`;
+    bodyHtml += `<th colspan=3 data-room-id="${room.id}">
+      <span class="room-name">${esc(room.name)}</span>
+      <span class="room-desc">${esc(room.desc)}</span>
+      <span class="room-cycle">every ${room.cleanDays}d</span>
+    </th>`;
+    for (const d of dates) {
+      const info = cellInfo(room, d);
+      const user = cleanedBy(room, d);
+      const isFuture = !!info.future;
+      const bg = cellColor(info.ratio, isFuture);
+      const fg = cellTextColor(info.ratio);
+      const todayCls = d === t ? ' col-today' : '';
+      let label = '';
+      if (info.state === 'cleaned') {
+        label = user ? (prefixes[user] || user.charAt(0).toUpperCase()) : '✓';
+      } else if (info.daysOverdue > 0) {
+        label = `+${info.daysOverdue}`;
+      }
+      bodyHtml += `<td class="${todayCls}" style="background:${bg};color:${fg}" data-room="${room.id}" data-date="${d}" title="${esc(room.name)} — ${dayLabel(d)}">${label}</td>`;
+    }
+    bodyHtml += '</tr>';
+  }
+  $('#table-body').innerHTML = bodyHtml;
+
+  // FLIP: animate rows to new positions
+  if (animate && Object.keys(oldPositions).length > 0) {
+    for (const tr of $('#table-body').querySelectorAll('tr[data-room-id]')) {
+      const id = tr.dataset.roomId;
+      if (id in oldPositions) {
+        const newTop = tr.getBoundingClientRect().top;
+        const delta = oldPositions[id] - newTop;
+        if (Math.abs(delta) > 1) {
+          tr.style.transition = 'none';
+          tr.style.transform = `translateY(${delta}px)`;
+          // Force reflow then animate
+          tr.offsetHeight;
+          tr.style.transition = '';
+          tr.style.transform = '';
+        }
+      }
+    }
+  }
+
+  // Footer summary row — clean count per day
+  let footHtml = '<tr><th colspan=3>Summary</th>';
+  for (const d of dates) {
+    let clean = 0;
+    for (const room of rooms) {
+      const s = cellInfo(room, d);
+      if (s.state === 'cleaned' || s.state === 'clean') clean++;
+    }
+    const total = rooms.length;
+    const todayCls = d === t ? ' col-today' : '';
+    footHtml += `<td class="${todayCls}">${clean}/${total}</td>`;
+  }
+  footHtml += '</tr>';
+  $('#table-foot').innerHTML = footHtml;
+
+  // Scroll so today column is visible (roughly centered)
+  const todayTh = $('#table-head th.today');
+  if (todayTh) todayTh.scrollIntoView({ inline: 'center', block: 'nearest' });
+}
+
+function esc(s) { const el = document.createElement('span'); el.textContent = s; return el.innerHTML; }
+
+// ── Cell Click ───────────────────────────────────────────────
+$('#table-body').addEventListener('click', e => {
+  const td = e.target.closest('td[data-room][data-date]');
+  if (td) {
+    toggleCell(td.dataset.room, td.dataset.date);
+    return;
+  }
+  const th = e.target.closest('th[data-room-id]');
+  if (th) {
+    openRoomDialog(th.dataset.roomId);
+  }
+});
+
+function toggleCell(roomId, date) {
+  // Allow toggling today and past, not future
+  if (date > today()) return;
+  if (!DATA.entries[date]) DATA.entries[date] = {};
+  const existing = DATA.entries[date][roomId];
+  if (existing?.cleaned) {
+    delete DATA.entries[date][roomId];
+  } else {
+    DATA.entries[date][roomId] = { cleaned: true, user: DATA.selectedUser || '' };
+  }
+  save();
+  renderTable(true);  // animate re-sort
+  renderHistory();
+}
+
+// ── Room Dialog ──────────────────────────────────────────────
+let editingRoomId = null;
+function openRoomDialog(roomId) {
+  editingRoomId = roomId || null;
+  const dialog = $('#room-dialog');
+  if (roomId) {
+    const room = DATA.rooms.find(r => r.id === roomId);
+    if (!room) return;
+    $('#room-dialog-title').textContent = 'Edit Room';
+    $('#room-name').value = room.name;
+    $('#room-desc').value = room.desc;
+    $('#room-days').value = room.cleanDays;
+    $('#room-delete').style.display = '';
+  } else {
+    $('#room-dialog-title').textContent = 'Add Room';
+    $('#room-name').value = '';
+    $('#room-desc').value = '';
+    $('#room-days').value = 3;
+    $('#room-delete').style.display = 'none';
+  }
+  dialog.showModal();
+}
+$('#btn-add-room').addEventListener('click', () => openRoomDialog(null));
+$('#room-cancel').addEventListener('click', () => $('#room-dialog').close());
+$('#room-save').addEventListener('click', () => {
+  const name = $('#room-name').value.trim();
+  if (!name) return;
+  const desc = $('#room-desc').value.trim();
+  const cleanDays = Math.max(1, parseInt($('#room-days').value) || 3);
+  if (editingRoomId) {
+    const room = DATA.rooms.find(r => r.id === editingRoomId);
+    if (room) { room.name = name; room.desc = desc; room.cleanDays = cleanDays; }
+  } else {
+    DATA.rooms.push({ id: uid(), name, desc, cleanDays });
+  }
+  save(); renderTable(); renderHistory();
+  $('#room-dialog').close();
+});
+$('#room-delete').addEventListener('click', () => {
+  if (editingRoomId && confirm('Delete this room?')) {
+    DATA.rooms = DATA.rooms.filter(r => r.id !== editingRoomId);
+    // Clean entries
+    for (const d of Object.keys(DATA.entries)) {
+      delete DATA.entries[d]?.[editingRoomId];
+    }
+    save(); renderTable(); renderHistory();
+    $('#room-dialog').close();
+  }
+});
+
+// ── Settings Dialog ──────────────────────────────────────────
+$('#btn-settings').addEventListener('click', () => {
+  $('#settings-days-shown').value = DATA.settings.daysShown;
+  $('#settings-history-days').value = DATA.settings.historyDays;
+  $('#settings-theme').value = DATA.settings.theme || 'dark';
+  renderSettingsUsers();
+  $('#settings-dialog').showModal();
+});
+$('#settings-close').addEventListener('click', () => $('#settings-dialog').close());
+$('#settings-save').addEventListener('click', () => {
+  DATA.settings.daysShown = Math.max(5, parseInt($('#settings-days-shown').value) || 14);
+  DATA.settings.historyDays = Math.max(7, parseInt($('#settings-history-days').value) || 30);
+  DATA.settings.theme = $('#settings-theme').value;
+  applyTheme();
+  save(); renderTable(); renderHistory();
+  $('#settings-dialog').close();
+});
+$('#settings-export').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(DATA, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'chore-tracker-backup.json';
+  a.click();
+});
+$('#settings-import').addEventListener('click', () => $('#settings-import-file').click());
+$('#settings-import-file').addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const imported = JSON.parse(reader.result);
+      if (imported.rooms && imported.entries) {
+        DATA = imported;
+        applyTheme();
+        save(); renderTable(); renderUsers(); renderSettingsUsers(); renderHistory();
+        $('#settings-dialog').close();
+      } else { alert('Invalid backup file.'); }
+    } catch { alert('Could not parse file.'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+// ── Users ────────────────────────────────────────────────────
+function renderUsers() {
+  // Top bar: selectable chips only (no ✕)
+  const list = $('#user-list');
+  list.innerHTML = DATA.users.map(u =>
+    `<span class="user-chip${DATA.selectedUser === u ? ' selected' : ''}" data-user="${esc(u)}">${esc(u)}</span>`
+  ).join('');
+}
+$('#user-list').addEventListener('click', e => {
+  const chip = e.target.closest('.user-chip');
+  if (chip) {
+    const name = chip.dataset.user;
+    DATA.selectedUser = DATA.selectedUser === name ? null : name;
+    save(); renderUsers();
+  }
+});
+function renderSettingsUsers() {
+  const list = $('#settings-user-list');
+  list.innerHTML = DATA.users.map(u =>
+    `<span class="user-chip" data-user="${esc(u)}">${esc(u)}<span class="remove-user" data-remove="${esc(u)}">✕</span></span>`
+  ).join('');
+}
+$('#settings-user-list').addEventListener('click', e => {
+  const remove = e.target.closest('.remove-user');
+  if (remove) {
+    const name = remove.dataset.remove;
+    if (confirm(`Remove user "${name}"?`)) {
+      DATA.users = DATA.users.filter(u => u !== name);
+      if (DATA.selectedUser === name) DATA.selectedUser = null;
+      save(); renderUsers(); renderSettingsUsers();
+    }
+  }
+});
+function addUser() {
+  const input = $('#new-user-input');
+  const name = input.value.trim();
+  if (!name || DATA.users.includes(name)) return;
+  DATA.users.push(name);
+  DATA.selectedUser = name;
+  input.value = '';
+  save(); renderUsers(); renderSettingsUsers();
+}
+$('#btn-add-user').addEventListener('click', addUser);
+$('#new-user-input').addEventListener('keydown', e => { if (e.key === 'Enter') addUser(); });
+
+// ── History Chart (canvas) ───────────────────────────────────
+function computeHistory() {
+  const days = DATA.settings.historyDays || 30;
+  const t = today();
+  const result = [];                     // [{ date, clean, overdue }]
+  for (let i = days - 1; i >= 0; i--) {
+    const d = addDays(t, -i);
+    let clean = 0, overdue = 0;
+    for (const room of DATA.rooms) {
+      const s = cellState(room, d);
+      if (s === 'cleaned' || s === 'clean') clean++;
+      else if (s === 'overdue') overdue++;
+    }
+    result.push({ date: d, clean, overdue });
+  }
+  return result;
+}
+
+function renderHistory() {
+  const history = computeHistory();
+  const canvas = $('#history-chart');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const W = rect.width;
+  const H = rect.height;
+  if (W < 10 || H < 5) return;           // not visible yet
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const maxRooms = DATA.rooms.length || 1;
+  const pad = 1;
+
+  // Build "clean ratio" series: 1 = all clean, 0 = all overdue
+  const pts = history.map(h => h.clean / maxRooms);
+
+  // Draw filled area + line sparkline
+  const stepX = (W - pad * 2) / Math.max(pts.length - 1, 1);
+  const yFor = v => pad + (1 - v) * (H - pad * 2);
+
+  // Gradient fill under the line
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  const cs = getComputedStyle(document.documentElement);
+  grad.addColorStop(0, cs.getPropertyValue('--spark-fill0').trim());
+  grad.addColorStop(1, cs.getPropertyValue('--spark-fill1').trim());
+  ctx.beginPath();
+  ctx.moveTo(pad, H);
+  pts.forEach((v, i) => ctx.lineTo(pad + i * stepX, yFor(v)));
+  ctx.lineTo(pad + (pts.length - 1) * stepX, H);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  pts.forEach((v, i) => {
+    const x = pad + i * stepX, y = yFor(v);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = cs.getPropertyValue('--spark-line').trim();
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  // Overdue line (inverted)
+  const optsRed = history.map(h => h.overdue / maxRooms);
+  ctx.beginPath();
+  optsRed.forEach((v, i) => {
+    const x = pad + i * stepX, y = H - pad - v * (H - pad * 2);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = cs.getPropertyValue('--spark-red').trim();
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Dot for today (last point)
+  const lastX = pad + (pts.length - 1) * stepX;
+  const lastY = yFor(pts[pts.length - 1]);
+  ctx.beginPath(); ctx.arc(lastX, lastY, 2.5, 0, Math.PI * 2);
+  ctx.fillStyle = cs.getPropertyValue('--spark-line').trim(); ctx.fill();
+
+  // Sunday tick marks — full height lines
+  ctx.strokeStyle = cs.getPropertyValue('--spark-sun').trim();
+  ctx.lineWidth = 1;
+  history.forEach((h, i) => {
+    const dow = new Date(h.date + 'T12:00:00').getDay(); // 0 = Sunday
+    if (dow === 0) {
+      const x = Math.round(pad + i * stepX) + 0.5;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+  });
+
+  // Update sparkline label
+  $('#history-label').textContent = `${DATA.settings.historyDays}-day History`;
+
+  // Summary text
+  const last = history[history.length - 1];
+  const totalClean = history.reduce((s, h) => s + h.clean, 0);
+  const totalOverdue = history.reduce((s, h) => s + h.overdue, 0);
+  $('#history-summary').textContent =
+    `${last?.clean || 0}✓ ${last?.overdue || 0}✗ · ${totalClean}/${totalClean + totalOverdue} room-days`;
+}
+
+// ── Tooltip on hover/long-press ──────────────────────────────
+$('#table-body').addEventListener('pointerover', e => {
+  const td = e.target.closest('td[data-room][data-date]');
+  if (!td) { $('#cell-tooltip').style.display = 'none'; return; }
+  const room = DATA.rooms.find(r => r.id === td.dataset.room);
+  if (!room) return;
+  const user = cleanedBy(room, td.dataset.date);
+  const info = cellInfo(room, td.dataset.date);
+  let stateLabel;
+  if (info.state === 'cleaned') stateLabel = 'Cleaned today';
+  else if (info.daysOverdue > 0) stateLabel = `Overdue by ${info.daysOverdue}d`;
+  else if (info.daysSince > 0) stateLabel = `Clean (${info.daysSince}d ago, due in ${room.cleanDays - info.daysSince}d)`;
+  else stateLabel = 'Not yet cleaned';
+  if (info.future) stateLabel = 'Projected: ' + stateLabel;
+  const tip = `${room.name} — ${dayLabel(td.dataset.date)}\n${stateLabel}${user ? '\nBy: ' + user : ''}`;
+  const tt = $('#cell-tooltip');
+  tt.textContent = tip; tt.style.whiteSpace = 'pre-line';
+  tt.style.display = 'block';
+  tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 210) + 'px';
+  tt.style.top = (e.clientY + 12) + 'px';
+});
+$('#table-body').addEventListener('pointerleave', () => { $('#cell-tooltip').style.display = 'none'; });
+
+// ── Garbage-collect old entries (> 120 days) ─────────────────
+function gc() {
+  const cutoff = addDays(today(), -120);
+  for (const d of Object.keys(DATA.entries)) {
+    if (d < cutoff) delete DATA.entries[d];
+  }
+  save();
+}
+
+// ── Theme ────────────────────────────────────────────────────
+function applyTheme() {
+  const theme = DATA.settings.theme || 'dark';
+  document.documentElement.setAttribute('data-theme', theme);
+  invalidateNeutralCache();
+}
+
+// ── Init ─────────────────────────────────────────────────────
+load();
+applyTheme();
+gc();
+renderTable();
+renderUsers();
+renderHistory();
+
+// Refresh at midnight
+setInterval(() => { renderTable(); renderHistory(); }, 60_000);
+
+// Resize chart on window resize
+window.addEventListener('resize', () => { renderHistory(); });
+
+// Register service worker for offline PWA support
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
