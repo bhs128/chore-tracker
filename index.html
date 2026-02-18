@@ -356,6 +356,21 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
 #chore-table tbody tr.drill-parent th {
   background: var(--today-bg);
 }
+
+/* ── Room Manager Dialog ──────────────────────────────────── */
+#room-manager-dialog { max-width: 480px; }
+#room-manager-list {
+  display: flex; flex-direction: column; gap: 4px;
+  max-height: 300px; overflow-y: auto; margin-bottom: 8px;
+}
+.rm-item {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--cell-bg); padding: 6px 10px; border-radius: 6px;
+  cursor: pointer; transition: background .12s;
+}
+.rm-item:hover { background: var(--btn-hover); }
+.rm-item .rm-name { flex: 1; font-size: .85rem; font-weight: 600; }
+.rm-item .rm-info { font-size: .68rem; color: var(--desc-text); flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -393,7 +408,7 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
     <div class="tb-sep"></div>
 
     <div class="actions">
-      <button id="btn-add-room">+ Room</button>
+      <button id="btn-add-room">✏ Rooms</button>
       <button id="btn-settings">⚙</button>
     </div>
   </header>
@@ -416,6 +431,17 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
 
 <!-- Cell tooltip -->
 <div id="cell-tooltip"></div>
+
+<!-- Room Manager dialog -->
+<dialog id="room-manager-dialog">
+  <h3>Manage Rooms</h3>
+  <div id="room-manager-list"></div>
+  <div class="dialog-actions">
+    <button id="rm-add-room" class="primary">+ New Room</button>
+    <span style="flex:1"></span>
+    <button id="rm-close">Close</button>
+  </div>
+</dialog>
 
 <!-- Room dialog -->
 <dialog id="room-dialog">
@@ -1111,10 +1137,14 @@ $('#table-body').addEventListener('click', e => {
     return;
   }
 
-  // Room header: open edit dialog
+  // Room header: drill down (rooms with tasks) or edit (simple rooms)
   const th = e.target.closest('th[data-room-id]');
   if (th) {
-    openRoomDialog(th.dataset.roomId);
+    const room = DATA.rooms.find(r => r.id === th.dataset.roomId);
+    if (room && roomHasTasks(room)) {
+      drillDown = { type: 'room', roomId: room.id };
+      renderTable();
+    }
     return;
   }
 
@@ -1283,8 +1313,25 @@ $('#new-task-label').addEventListener('input', () => {
   if (val && _taskDaysMap[val] !== undefined) $('#new-task-days').value = _taskDaysMap[val];
 });
 
-$('#btn-add-room').addEventListener('click', () => openRoomDialog(null));
-$('#room-cancel').addEventListener('click', () => $('#room-dialog').close());
+$('#btn-add-room').addEventListener('click', () => openRoomManager());
+$('#rm-close').addEventListener('click', () => $('#room-manager-dialog').close());
+$('#rm-add-room').addEventListener('click', () => { $('#room-manager-dialog').close(); openRoomDialog(null); });
+$('#room-manager-list').addEventListener('click', e => {
+  const item = e.target.closest('.rm-item');
+  if (item) { $('#room-manager-dialog').close(); openRoomDialog(item.dataset.roomId); }
+});
+function openRoomManager() {
+  const list = $('#room-manager-list');
+  list.innerHTML = DATA.rooms.map(r => {
+    const taskCount = roomHasTasks(r) ? r.tasks.length + ' task' + (r.tasks.length > 1 ? 's' : '') : 'no tasks';
+    return `<div class="rm-item" data-room-id="${r.id}">
+      <span class="rm-name">${esc(r.name)}</span>
+      <span class="rm-info">${taskCount}</span>
+    </div>`;
+  }).join('') || '<div style="text-align:center;color:var(--desc-text);padding:12px">No rooms yet</div>';
+  $('#room-manager-dialog').showModal();
+}
+$('#room-cancel').addEventListener('click', () => { $('#room-dialog').close(); openRoomManager(); });
 $('#room-save').addEventListener('click', () => {
   const name = $('#room-name').value.trim();
   if (!name) return;
@@ -1299,6 +1346,7 @@ $('#room-save').addEventListener('click', () => {
   }
   save(); renderTable(); renderHistory();
   $('#room-dialog').close();
+  openRoomManager();
 });
 $('#room-delete').addEventListener('click', () => {
   if (editingRoomId && confirm('Delete this room?')) {
@@ -1307,6 +1355,7 @@ $('#room-delete').addEventListener('click', () => {
     if (drillDown?.type === 'room' && drillDown.roomId === editingRoomId) drillDown = null;
     save(); renderTable(); renderHistory();
     $('#room-dialog').close();
+    openRoomManager();
   }
 });
 
