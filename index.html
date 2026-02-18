@@ -468,6 +468,7 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
     <button id="settings-export">Export JSON</button>
     <button id="settings-import">Import JSON</button>
     <input type="file" id="settings-import-file" accept=".json" style="display:none">
+    <button id="settings-reset" class="danger">Reset All</button>
     <span style="flex:1"></span>
     <button id="settings-close">Close</button>
     <button id="settings-save" class="primary">Save</button>
@@ -1316,6 +1317,15 @@ $('#settings-import-file').addEventListener('change', e => {
   };
   reader.readAsText(file);
   e.target.value = '';
+});
+$('#settings-reset').addEventListener('click', () => {
+  if (confirm('Erase ALL data and start fresh? This cannot be undone.')) {
+    DATA = defaultData();
+    drillDown = null; viewMode = 'room';
+    applyTheme();
+    save(); renderTable(); renderUsers(); renderSettingsUsers(); renderHistory(); updateViewToggle();
+    $('#settings-dialog').close();
+  }
 });
 
 // ── Users ────────────────────────────────────────────────────
