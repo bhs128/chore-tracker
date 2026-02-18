@@ -1138,12 +1138,17 @@ $('#table-body').addEventListener('click', e => {
     return;
   }
 
-  // Aggregate cell: drill down
+  // Aggregate cell: drill down (or auto-toggle if single room)
   const tdAgg = e.target.closest('td[data-aggregate]');
   if (tdAgg) {
     if (tdAgg.dataset.aggregate === 'room') {
       drillDown = { type: 'room', roomId: tdAgg.dataset.room };
     } else if (tdAgg.dataset.aggregate === 'tasktype') {
+      const roomTasks = getRoomsForTaskType(tdAgg.dataset.tasktype);
+      if (roomTasks.length === 1 && tdAgg.dataset.date) {
+        toggleTaskCell(roomTasks[0].room.id, roomTasks[0].task.id, tdAgg.dataset.date);
+        return;
+      }
       drillDown = { type: 'tasktype', taskLabel: tdAgg.dataset.tasktype };
     }
     renderTable();
