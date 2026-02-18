@@ -120,23 +120,6 @@ All data is stored in `localStorage` under the key `chore-tracker-data`:
 - Rooms with tasks store per-task completion under `entries[date][roomId].tasks[taskId]`.
 - Old entries (>120 days) are automatically garbage-collected on load.
 
-## Default Rooms
-
-The app ships with 10 pre-configured rooms and 12 unique task types:
-
-| Room | Tasks |
-|------|-------|
-| Main Bathroom | Wash Mirror (7d), Fill Soap (14d), Wash Counter (14d), Sweep/Mop (30d), Vacuum (14d), Pickup/Tidy (7d), Clean Toilet Bowl (30d), Replace Towels/Mats (14d), Empty Trash/Recycling (14d) |
-| Upstairs Bathroom | Same as Main Bathroom + Wash Tub/Shower (30d) |
-| Kitchen | Fill Soap (14d), Wash Counter (14d), Sweep/Mop (30d), Pickup/Tidy (7d), Replace Towels/Mats (14d), Empty Trash/Recycling (3d), Do Dishes (1d) |
-| Dining Room | Vacuum (14d), Pickup/Tidy (7d) |
-| Living Room | Vacuum (14d), Pickup/Tidy (7d) |
-| Den/Music Room | Vacuum (14d), Pickup/Tidy (7d) |
-| Kids Bedroom | Vacuum (14d), Pickup/Tidy (7d) |
-| Mom & Dads Room | Vacuum (14d), Pickup/Tidy (7d) |
-| Laundry Room | Fill Soap (30d), Pickup/Tidy (7d), Empty Trash/Recycling (14d), Do Laundry (1d) |
-| Office | Pickup/Tidy (7d), Empty Trash/Recycling (14d) |
-
 ## Feature Roadmap
 
 ### Schedules (Room Lists / Categories)
