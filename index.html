@@ -1187,17 +1187,27 @@ function renderDialogTasks() {
   updateTaskSuggestions();
 }
 
+let _taskDaysMap = {};
+
 function updateTaskSuggestions() {
   const existing = new Set(dialogTasks.map(t => t.label.trim().toLowerCase()));
-  const all = new Set();
+  const labelDays = {};
   for (const room of DATA.rooms) {
     if (!room.tasks) continue;
     for (const task of room.tasks) {
       const lbl = task.label.trim();
-      if (lbl && !existing.has(lbl.toLowerCase())) all.add(lbl);
+      if (!lbl || existing.has(lbl.toLowerCase())) continue;
+      if (!labelDays[lbl]) labelDays[lbl] = {};
+      labelDays[lbl][task.cleanDays] = (labelDays[lbl][task.cleanDays] || 0) + 1;
     }
   }
-  $('#task-suggestions').innerHTML = [...all].sort().map(l => `<option value="${esc(l)}">`).join('');
+  _taskDaysMap = {};
+  const labels = Object.keys(labelDays).sort();
+  for (const lbl of labels) {
+    const counts = labelDays[lbl];
+    _taskDaysMap[lbl.toLowerCase()] = parseInt(Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]);
+  }
+  $('#task-suggestions').innerHTML = labels.map(l => `<option value="${esc(l)}">`).join('');
 }
 
 // Task list event delegation
@@ -1206,7 +1216,14 @@ $('#task-list').addEventListener('input', e => {
   if (!item) return;
   const idx = parseInt(item.dataset.idx);
   const field = e.target.dataset.field;
-  if (field === 'label') dialogTasks[idx].label = e.target.value;
+  if (field === 'label') {
+    dialogTasks[idx].label = e.target.value;
+    const val = e.target.value.trim().toLowerCase();
+    if (val && _taskDaysMap[val] !== undefined) {
+      dialogTasks[idx].cleanDays = _taskDaysMap[val];
+      item.querySelector('input[data-field="cleanDays"]').value = _taskDaysMap[val];
+    }
+  }
   else if (field === 'cleanDays') dialogTasks[idx].cleanDays = Math.max(1, parseInt(e.target.value) || 1);
 });
 $('#task-list').addEventListener('click', e => {
@@ -1225,6 +1242,10 @@ $('#btn-add-task').addEventListener('click', () => {
   renderDialogTasks();
 });
 $('#new-task-label').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#btn-add-task').click(); } });
+$('#new-task-label').addEventListener('input', () => {
+  const val = $('#new-task-label').value.trim().toLowerCase();
+  if (val && _taskDaysMap[val] !== undefined) $('#new-task-days').value = _taskDaysMap[val];
+});
 
 $('#btn-add-room').addEventListener('click', () => openRoomDialog(null));
 $('#room-cancel').addEventListener('click', () => $('#room-dialog').close());
