@@ -332,17 +332,22 @@ dialog .dialog-actions { display: flex; gap: 8px; margin-top: 16px; justify-cont
   display: flex; align-items: center; gap: 6px;
   background: var(--cell-bg); padding: 4px 8px; border-radius: 6px;
 }
-.task-item input[type="text"] { flex: 1; width: auto; }
-.task-item input[type="number"] { width: 50px; }
+.task-item input[type="text"] { flex: 1; min-width: 0; width: auto; }
+.task-item input[type="number"] { width: 60px; flex-shrink: 0; }
 .task-item .remove-task {
-  color: var(--accent); cursor: pointer; font-size: .8rem; font-weight: 700;
+  cursor: pointer; font-size: .8rem; font-weight: 700;
   background: none; border: none; padding: 2px 4px; color: var(--text);
 }
-#add-task-row {
-  display: flex; gap: 4px; margin-top: 4px;
+.no-tasks-placeholder {
+  font-size: .75rem; color: var(--desc-text); font-style: italic;
+  padding: 6px 0; text-align: center;
 }
-#add-task-row input[type="text"] { flex: 1; width: auto; }
-#add-task-row input[type="number"] { width: 50px; }
+#add-task-row {
+  display: flex; gap: 4px; margin-top: 8px;
+  padding-top: 8px; border-top: 1px solid var(--sep-color);
+}
+#add-task-row input[type="text"] { flex: 1; min-width: 0; width: auto; }
+#add-task-row input[type="number"] { width: 60px; flex-shrink: 0; }
 
 /* ── Aggregate cell styling ────────────────────────────────── */
 td.cell-aggregate { font-size: .65rem; font-weight: 700; }
@@ -427,9 +432,10 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
     </div>
     <div id="task-list"></div>
     <div id="add-task-row">
-      <input id="new-task-label" type="text" placeholder="Task name…" maxlength="30">
+      <input id="new-task-label" type="text" placeholder="Add task…" maxlength="30" list="task-suggestions">
       <input id="new-task-days" type="number" min="1" max="30" value="3" title="Clean cycle (days)">
       <button id="btn-add-task" type="button">+</button>
+      <datalist id="task-suggestions"></datalist>
     </div>
   </div>
   <div class="dialog-actions">
@@ -884,7 +890,6 @@ function renderRoomView(dates, t, prefixes, animate) {
 
 function renderTaskTypeView(dates, t, prefixes) {
   const taskTypes = sortedTaskTypes();
-  const simpleRooms = sortedRooms().filter(r => !roomHasTasks(r));
 
   let html = '';
   for (const tt of taskTypes) {
@@ -903,30 +908,7 @@ function renderTaskTypeView(dates, t, prefixes) {
     html += '</tr>';
   }
 
-  // Simple rooms (no tasks) at the bottom
-  for (const room of simpleRooms) {
-    html += `<tr data-row-id="${room.id}" data-room-id="${room.id}">`;
-    html += `<th colspan=3 data-room-id="${room.id}">
-      <span class="room-name">${esc(room.name)}</span>
-      <span class="room-desc">${esc(room.desc)}</span>
-      <span class="room-cycle">every ${room.cleanDays}d</span>
-    </th>`;
-    for (const d of dates) {
-      const info = cellInfo(room, d);
-      const user = cleanedBy(room, d);
-      const isFuture = !!info.future;
-      const bg = cellColor(info.ratio, isFuture);
-      const fg = cellTextColor(info.ratio);
-      const todayCls = d === t ? ' col-today' : '';
-      let label = '';
-      if (info.state === 'cleaned') label = user ? (prefixes[user] || user.charAt(0).toUpperCase()) : '✓';
-      else if (info.daysOverdue > 0) label = `+${info.daysOverdue}`;
-      html += `<td class="${todayCls}" style="background:${bg};color:${fg}" data-room="${room.id}" data-date="${d}">${label}</td>`;
-    }
-    html += '</tr>';
-  }
-
-  if (taskTypes.length === 0 && simpleRooms.length === 0) {
+  if (taskTypes.length === 0) {
     html = '<tr><td colspan="100" style="text-align:center;color:var(--desc-text);padding:20px">No task types defined. Edit a room to add tasks.</td></tr>';
   }
 
@@ -939,11 +921,6 @@ function renderTaskTypeView(dates, t, prefixes) {
     for (const tt of taskTypes) {
       const info = taskTypeAggCellInfo(tt.label, d);
       clean += info.cleaned; total += info.total;
-    }
-    for (const room of simpleRooms) {
-      const s = cellInfo(room, d);
-      if (s.state === 'cleaned' || s.state === 'clean') clean++;
-      total++;
     }
     const todayCls = d === t ? ' col-today' : '';
     footHtml += `<td class="${todayCls}">${clean}/${total}</td>`;
@@ -1195,14 +1172,32 @@ function openRoomDialog(roomId) {
 
 function renderDialogTasks() {
   const list = $('#task-list');
-  list.innerHTML = dialogTasks.map((t, i) =>
-    `<div class="task-item" data-idx="${i}">
-      <input type="text" value="${esc(t.label)}" data-field="label" placeholder="Task name">
-      <input type="number" value="${t.cleanDays}" data-field="cleanDays" min="1" max="30" title="Clean cycle (days)">
-      <span style="font-size:.65rem;color:var(--cycle-text)">d</span>
-      <button class="remove-task" data-idx="${i}" type="button">✕</button>
-    </div>`
-  ).join('');
+  if (dialogTasks.length === 0) {
+    list.innerHTML = '<div class="no-tasks-placeholder">No tasks defined — room uses simple toggle</div>';
+  } else {
+    list.innerHTML = dialogTasks.map((t, i) =>
+      `<div class="task-item" data-idx="${i}">
+        <input type="text" value="${esc(t.label)}" data-field="label" placeholder="Task name" list="task-suggestions">
+        <input type="number" value="${t.cleanDays}" data-field="cleanDays" min="1" max="30" title="Clean cycle (days)">
+        <span style="font-size:.65rem;color:var(--cycle-text)">d</span>
+        <button class="remove-task" data-idx="${i}" type="button">✕</button>
+      </div>`
+    ).join('');
+  }
+  updateTaskSuggestions();
+}
+
+function updateTaskSuggestions() {
+  const existing = new Set(dialogTasks.map(t => t.label.trim().toLowerCase()));
+  const all = new Set();
+  for (const room of DATA.rooms) {
+    if (!room.tasks) continue;
+    for (const task of room.tasks) {
+      const lbl = task.label.trim();
+      if (lbl && !existing.has(lbl.toLowerCase())) all.add(lbl);
+    }
+  }
+  $('#task-suggestions').innerHTML = [...all].sort().map(l => `<option value="${esc(l)}">`).join('');
 }
 
 // Task list event delegation
