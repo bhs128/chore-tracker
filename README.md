@@ -6,23 +6,40 @@ A single-page, open-source household chore dashboard designed for always-on tabl
 
 ## Features
 
-- **Touch-first kiosk UI** — landscape, no-scroll, fullscreen-friendly
-- **Room × Day grid** — tap a cell to mark a room as cleaned
-- **Configurable clean cycles** — each room has a "stays clean for N days" setting
-- **Color gradient status** — green → neutral → red based on how overdue a room is, with future-day projections
-- **Auto-sort by urgency** — rooms automatically reorder so the most overdue appear at the top, with smooth FLIP animation on state changes
-- **Today column highlight** — current day is visually emphasized in the table
-- **Footer summary row** — sticky bottom row showing clean/total counts per day
-- **Cell tooltip** — hover or long-press a cell to see detailed status (days since cleaned, days until due, who cleaned)
-- **User selection** — tap a name chip in the top bar before checking off a chore; cells show unique user-name prefixes to distinguish similar names
+### Core
+
+- **Touch-first kiosk UI** — landscape, no-scroll, fullscreen-friendly with 44px minimum tap targets
+- **Dual-view grid** — switch between **🏠 Room View** (one row per room) and **📋 Task View** (one row per task type, aggregated across rooms)
+- **Drill-down navigation** — tap aggregate cells or row headers to see individual tasks within a room, or individual rooms for a task type; navigate back with the ← breadcrumb bar
+- **Per-room task definitions** — each room can have named tasks (e.g. "Vacuum", "Sweep/Mop"), each with its own independent clean cycle; rooms without tasks use simple single-tap toggle
+- **Task type aggregation** — tasks with the same name across different rooms are automatically merged in Task View (e.g. all "Vacuum" tasks appear as one row showing completion across rooms)
+- **Configurable clean cycles** — each task (or simple room) has a "stays clean for N days" setting (1–30)
+- **Color gradient status** — green → neutral → red based on how overdue a task is, with future-day projections shown at reduced opacity
+- **Auto-sort by urgency** — rows automatically reorder so the most overdue appear at the top, with smooth FLIP animation; sort order is frozen during drill-down to prevent disorienting jumps
+- **Smart single-room toggle** — in Task View, tapping a day-cell for a task type that exists in only one room directly toggles it instead of drilling down
+
+### Display
+
+- **Today column highlight** — current day column emphasized with a blue inset border and auto-scrolled into view
+- **Footer summary row** — sticky bottom row showing clean/total counts per day, scoped to the current view or drill-down
+- **Cell tooltip** — hover or long-press a cell to see detailed status (days since cleaned, days until due, who cleaned, projected state for future dates)
+- **Sparkline history** — compact canvas chart in the top bar showing clean vs overdue trends over a configurable period, with Sunday tick marks
+
+### Users & Settings
+
+- **User selection** — tap a name chip in the top bar before checking off a chore; cells show computed shortest-unique prefixes to distinguish users
 - **User management** — add/remove users from the settings panel
-- **Sparkline history** — compact canvas chart in the top bar showing clean vs overdue trends with Sunday tick marks
-- **Dark & Light themes** — toggle in settings; all colors adapt via CSS custom properties (blue accent palette)
-- **Self-hosted Poppins font** — three weights (400/600/700) bundled as woff2 for offline use
+- **Dark & Light themes** — toggle in settings; all colors adapt via CSS custom properties
+- **Import / Export** — back up and restore all data as a JSON file
+- **Reset All** — wipe all data and restore defaults from the settings panel
+
+### Technical
+
 - **PWA / Installable** — manifest + service worker for "Add to Home Screen" and full offline support
 - **100% client-side** — all data lives in `localStorage`, nothing leaves your browser
 - **Zero dependencies** — single HTML file, no build step, no frameworks
-- **Import / Export** — back up and restore data as JSON
+- **Self-hosted Poppins font** — three weights (400/600/700) bundled as woff2 for offline use
+- **Auto-refresh** — table and history chart re-render every 60 seconds to handle day rollover
 
 
 ### Local Deployment / Kiosk
@@ -41,14 +58,16 @@ For kiosk mode:
 
 ## Usage
 
-1. **Add rooms** — click "+ Room" and set name, description, and clean cycle (days)
-2. **Add users** — open ⚙ Settings, type a name in the user input and press Enter or "+"
-3. **Select yourself** — tap your name chip in the top bar (it highlights with a blue border)
-4. **Mark chores done** — tap a cell in the grid; it records who cleaned and when
-5. **Tap again to undo** — toggle off a mistaken entry
-6. **Edit/delete rooms** — tap a room's name in the left column
-7. **Adjust settings** — click ⚙ to change visible days, history range, color theme, or import/export data
-8. **Install as app** — use your browser's "Add to Home Screen" or "Install App" option for a standalone kiosk experience
+1. **Manage rooms** — tap "✏ Rooms" to open the room manager; add, edit, or delete rooms
+2. **Add tasks to a room** — in the room editor, add named tasks (e.g. "Vacuum", "Mop") with individual clean cycles; autocomplete suggests task names used in other rooms and auto-fills the most common cycle length
+3. **Add users** — open ⚙ Settings, type a name and press Enter or "+"
+4. **Select yourself** — tap your name chip in the top bar (highlighted with a blue border)
+5. **Switch views** — use the 🏠 / 📋 toggle to switch between Room View and Task View
+6. **Mark chores done** — tap a cell in the grid; for rooms with tasks, tap aggregate cells to drill down, then check off individual tasks
+7. **Tap again to undo** — toggle off a mistaken entry
+8. **Drill down** — tap a room name (Room View) or task type name (Task View) to see the breakdown; tap ← Back to return
+9. **Adjust settings** — click ⚙ to change visible days, history range, color theme, or import/export data
+10. **Install as app** — use your browser's "Add to Home Screen" or "Install App" option for a standalone kiosk experience
 
 ## Project Structure
 
@@ -68,11 +87,28 @@ All data is stored in `localStorage` under the key `chore-tracker-data`:
 
 ```json
 {
-  "rooms": [{ "id": "...", "name": "Kitchen", "desc": "...", "cleanDays": 2 }],
+  "rooms": [
+    {
+      "id": "...",
+      "name": "Kitchen",
+      "desc": "...",
+      "cleanDays": 1,
+      "tasks": [
+        { "id": "...", "label": "Do Dishes", "cleanDays": 1 },
+        { "id": "...", "label": "Sweep/Mop", "cleanDays": 30 }
+      ]
+    }
+  ],
   "users": ["Alice", "Bob"],
   "entries": {
     "2026-02-17": {
-      "room-id": { "cleaned": true, "user": "Alice" }
+      "room-id": {
+        "cleaned": true,
+        "user": "Alice",
+        "tasks": {
+          "task-id": { "cleaned": true, "user": "Alice" }
+        }
+      }
     }
   },
   "settings": { "daysShown": 14, "historyDays": 30, "theme": "dark" },
@@ -80,13 +116,30 @@ All data is stored in `localStorage` under the key `chore-tracker-data`:
 }
 ```
 
-Old entries (>120 days) are automatically garbage-collected on load.
+- Rooms without a `tasks` array (or with an empty one) use simple single-tap toggle and store only `{ cleaned, user }` in entries.
+- Rooms with tasks store per-task completion under `entries[date][roomId].tasks[taskId]`.
+- Old entries (>120 days) are automatically garbage-collected on load.
+
+## Default Rooms
+
+The app ships with 10 pre-configured rooms and 12 unique task types:
+
+| Room | Tasks |
+|------|-------|
+| Main Bathroom | Wash Mirror (7d), Fill Soap (14d), Wash Counter (14d), Sweep/Mop (30d), Vacuum (14d), Pickup/Tidy (7d), Clean Toilet Bowl (30d), Replace Towels/Mats (14d), Empty Trash/Recycling (14d) |
+| Upstairs Bathroom | Same as Main Bathroom + Wash Tub/Shower (30d) |
+| Kitchen | Fill Soap (14d), Wash Counter (14d), Sweep/Mop (30d), Pickup/Tidy (7d), Replace Towels/Mats (14d), Empty Trash/Recycling (3d), Do Dishes (1d) |
+| Dining Room | Vacuum (14d), Pickup/Tidy (7d) |
+| Living Room | Vacuum (14d), Pickup/Tidy (7d) |
+| Den/Music Room | Vacuum (14d), Pickup/Tidy (7d) |
+| Kids Bedroom | Vacuum (14d), Pickup/Tidy (7d) |
+| Mom & Dads Room | Vacuum (14d), Pickup/Tidy (7d) |
+| Laundry Room | Fill Soap (30d), Pickup/Tidy (7d), Empty Trash/Recycling (14d), Do Laundry (1d) |
+| Office | Pickup/Tidy (7d), Empty Trash/Recycling (14d) |
 
 ## Feature Roadmap
 
-The following features are under consideration. They are listed in recommended implementation order.
-
-### 1. Schedules (Room Lists / Categories)
+### Schedules (Room Lists / Categories)
 
 **Problem:** Not every room needs cleaning on the same cadence or in the same context. A "Daily Tidy" schedule is different from a "Deep Clean" schedule, but they may overlap on the same physical rooms.
 
@@ -132,61 +185,6 @@ The following features are under consideration. They are listed in recommended i
   "settings": { "theme": "dark" }
 }
 ```
-
-### 2. Subtasks
-
-**Problem:** Some rooms have multiple distinct steps (e.g. Kitchen → wipe counters, sweep floor, clean sink). Currently the description field lists these as free text, but there's no way to track partial completion.
-
-**Approaches considered:**
-
-| Approach | Description | Pros | Cons |
-|----------|-------------|------|------|
-| **A — Description as reminder** | Keep the current free-text description; no tracking | Zero complexity, already works | No partial-completion visibility |
-| **B — Dialog checklist** ★ | Optional `subtasks` array on a room definition; tapping a cell opens a checklist dialog | Tracks partial progress, cell shows fraction (e.g. `3/5`), room only marked "cleaned" when all checked | Adds a dialog step to the tap flow |
-| **C — Inline expansion** | Expand the row into sub-rows for each subtask | Most granular tracking | Clutters the grid, breaks the compact kiosk layout |
-
-**Recommended: Start with A (free), graduate to B when tracking is needed**
-
-- Add optional `subtasks: [{ id, label }]` to each room definition.
-- When subtasks exist and user taps a cell, show a checklist dialog instead of immediate toggle.
-- Cell displays checked/total (e.g. `3/5`) and only counts as fully cleaned when all are checked.
-- Entry shape: `entries[date][roomId].subtasks = { taskId: true, ... }`.
-- **Staleness reset:** subtask checkmarks reset based on the room's clean cycle — once a new cycle begins, previous subtask checks are irrelevant.
-- Rooms without subtasks keep the current single-tap toggle behavior.
-
-**Data model sketch:**
-
-```json
-{
-  "rooms": [
-    {
-      "id": "...",
-      "name": "Kitchen",
-      "desc": "Full kitchen clean",
-      "cleanDays": 2,
-      "subtasks": [
-        { "id": "ct", "label": "Wipe counters" },
-        { "id": "sw", "label": "Sweep floor" },
-        { "id": "ds", "label": "Dishes" }
-      ]
-    }
-  ],
-  "entries": {
-    "2026-02-17": {
-      "room-id": {
-        "cleaned": true,
-        "user": "Alice",
-        "subtasks": { "ct": true, "sw": true, "ds": true }
-      }
-    }
-  }
-}
-```
-
-### Implementation Priority
-
-1. **Schedules first** — structural data model change that shapes everything else.
-2. **Subtasks second** — additive layer that sits on top of the existing room/entry model.
 
 ## License
 
