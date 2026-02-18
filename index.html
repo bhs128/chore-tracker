@@ -493,13 +493,48 @@ const uid = () => crypto.randomUUID?.() || Math.random().toString(36).slice(2, 1
 const STORAGE_KEY = 'chore-tracker-data';
 
 function defaultData() {
+  const t = (label, cleanDays) => ({ id: uid(), label, cleanDays });
   return {
     rooms: [
-      { id: uid(), name: 'Kitchen',   desc: 'Wipe counters, sweep, dishes', cleanDays: 2, tasks: [] },
-      { id: uid(), name: 'Bathroom',  desc: 'Toilet, sink, mirror',         cleanDays: 3, tasks: [] },
-      { id: uid(), name: 'Living Room', desc: 'Vacuum, dust, tidy up',      cleanDays: 4, tasks: [] },
+      { id: uid(), name: 'Main Bathroom', desc: '', cleanDays: 7, tasks: [
+        t('Wash Mirror',7), t('Fill Soap',14), t('Wash Counter',14), t('Sweep/Mop',30),
+        t('Vacuum',14), t('Pickup/Tidy',7), t('Clean Toilet Bowl',30),
+        t('Replace Towels/Mats',14), t('Empty Trash/Recycling',14)
+      ]},
+      { id: uid(), name: 'Upstairs Bathroom', desc: '', cleanDays: 7, tasks: [
+        t('Wash Mirror',7), t('Fill Soap',14), t('Wash Counter',14), t('Sweep/Mop',30),
+        t('Vacuum',14), t('Pickup/Tidy',7), t('Clean Toilet Bowl',30),
+        t('Replace Towels/Mats',14), t('Empty Trash/Recycling',14), t('Wash Tub/Shower',30)
+      ]},
+      { id: uid(), name: 'Kitchen', desc: '', cleanDays: 1, tasks: [
+        t('Fill Soap',14), t('Wash Counter',14), t('Sweep/Mop',30),
+        t('Pickup/Tidy',7), t('Replace Towels/Mats',14),
+        t('Empty Trash/Recycling',3), t('Do Dishes',1)
+      ]},
+      { id: uid(), name: 'Dining Room', desc: '', cleanDays: 7, tasks: [
+        t('Vacuum',14), t('Pickup/Tidy',7)
+      ]},
+      { id: uid(), name: 'Living Room', desc: '', cleanDays: 7, tasks: [
+        t('Vacuum',14), t('Pickup/Tidy',7)
+      ]},
+      { id: uid(), name: 'Den/Music Room', desc: '', cleanDays: 7, tasks: [
+        t('Vacuum',14), t('Pickup/Tidy',7)
+      ]},
+      { id: uid(), name: 'Kids Bedroom', desc: '', cleanDays: 7, tasks: [
+        t('Vacuum',14), t('Pickup/Tidy',7)
+      ]},
+      { id: uid(), name: 'Mom & Dads Room', desc: '', cleanDays: 7, tasks: [
+        t('Vacuum',14), t('Pickup/Tidy',7)
+      ]},
+      { id: uid(), name: 'Laundry Room', desc: '', cleanDays: 1, tasks: [
+        t('Fill Soap',30), t('Pickup/Tidy',7),
+        t('Empty Trash/Recycling',14), t('Do Laundry',1)
+      ]},
+      { id: uid(), name: 'Office', desc: '', cleanDays: 7, tasks: [
+        t('Pickup/Tidy',7), t('Empty Trash/Recycling',14)
+      ]},
     ],
-    users: ['Alice', 'Bob'],
+    users: [],
     entries: {},
     settings: { daysShown: 14, historyDays: 30 },
     selectedUser: null,
