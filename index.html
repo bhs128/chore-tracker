@@ -124,7 +124,7 @@ html, body {
 #app {
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto 1fr;
   height: 100vh; width: 100vw;
   gap: 0;
 }
@@ -289,6 +289,68 @@ dialog .dialog-actions { display: flex; gap: 8px; margin-top: 16px; justify-cont
 @media (max-width: 600px) {
   #top-bar { flex-wrap: wrap; gap: 6px; }
 }
+
+/* ── View Toggle ───────────────────────────────────────────── */
+.view-toggle {
+  display: flex; gap: 0; flex-shrink: 0;
+}
+.view-toggle button {
+  border-radius: 0; border-right-width: 0;
+  font-size: .72rem; padding: 4px 10px;
+}
+.view-toggle button:first-child { border-radius: 6px 0 0 6px; }
+.view-toggle button:last-child { border-radius: 0 6px 6px 0; border-right-width: 1px; }
+.view-toggle button.active {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+}
+
+/* ── Back Bar ──────────────────────────────────────────────── */
+#back-bar {
+  display: none; align-items: center; gap: 8px;
+  padding: 4px 14px;
+  background: var(--bar-bg);
+  border-bottom: 1px solid var(--bar-border);
+  font-size: .8rem;
+}
+#back-bar.visible { display: flex; }
+#back-bar button {
+  background: var(--btn-bg); color: var(--text); border: 1px solid var(--btn-border);
+  padding: 4px 10px; border-radius: 6px; font-size: .75rem; cursor: pointer;
+}
+#back-bar .breadcrumb { color: var(--head-text); font-size: .78rem; }
+#back-bar .breadcrumb strong { color: var(--text); }
+
+/* ── Task Management in Room Dialog ────────────────────────── */
+#task-section { margin-top: 8px; }
+#task-section .task-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 4px;
+}
+#task-section .task-header label { margin: 0; }
+#task-list { display: flex; flex-direction: column; gap: 4px; max-height: 150px; overflow-y: auto; }
+.task-item {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--cell-bg); padding: 4px 8px; border-radius: 6px;
+}
+.task-item input[type="text"] { flex: 1; width: auto; }
+.task-item input[type="number"] { width: 50px; }
+.task-item .remove-task {
+  color: var(--accent); cursor: pointer; font-size: .8rem; font-weight: 700;
+  background: none; border: none; padding: 2px 4px; color: var(--text);
+}
+#add-task-row {
+  display: flex; gap: 4px; margin-top: 4px;
+}
+#add-task-row input[type="text"] { flex: 1; width: auto; }
+#add-task-row input[type="number"] { width: 50px; }
+
+/* ── Aggregate cell styling ────────────────────────────────── */
+td.cell-aggregate { font-size: .65rem; font-weight: 700; }
+
+/* ── Drill-down parent row ─────────────────────────────────── */
+#chore-table tbody tr.drill-parent th {
+  background: var(--today-bg);
+}
 </style>
 </head>
 <body>
@@ -308,6 +370,14 @@ dialog .dialog-actions { display: flex; gap: 8px; margin-top: 16px; justify-cont
 
     <div class="tb-sep"></div>
 
+    <!-- View Toggle -->
+    <div class="view-toggle">
+      <button id="btn-view-room" class="active">🏠 Rooms</button>
+      <button id="btn-view-task">📋 Tasks</button>
+    </div>
+
+    <div class="tb-sep"></div>
+
     <!-- Sparkline history -->
     <div id="history-section">
       <span class="label" id="history-label">30-day History</span>
@@ -322,6 +392,12 @@ dialog .dialog-actions { display: flex; gap: 8px; margin-top: 16px; justify-cont
       <button id="btn-settings">⚙</button>
     </div>
   </header>
+
+  <!-- Drill-down back bar -->
+  <div id="back-bar">
+    <button id="btn-back">← Back</button>
+    <span class="breadcrumb" id="breadcrumb"></span>
+  </div>
 
   <!-- Main Table -->
   <section id="table-area">
@@ -345,6 +421,17 @@ dialog .dialog-actions { display: flex; gap: 8px; margin-top: 16px; justify-cont
   <textarea id="room-desc" placeholder="e.g. Wipe counters, sweep floor" maxlength="100"></textarea>
   <label for="room-days">Stays clean for (days)</label>
   <input id="room-days" type="number" min="1" max="30" value="3">
+  <div id="task-section">
+    <div class="task-header">
+      <label>Tasks (optional)</label>
+    </div>
+    <div id="task-list"></div>
+    <div id="add-task-row">
+      <input id="new-task-label" type="text" placeholder="Task name…" maxlength="30">
+      <input id="new-task-days" type="number" min="1" max="30" value="3" title="Clean cycle (days)">
+      <button id="btn-add-task" type="button">+</button>
+    </div>
+  </div>
   <div class="dialog-actions">
     <button id="room-delete" class="danger" style="display:none">Delete</button>
     <span style="flex:1"></span>
@@ -389,7 +476,7 @@ dialog .dialog-actions { display: flex; gap: 8px; margin-top: 16px; justify-cont
 // ── Helpers ──────────────────────────────────────────────────
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
-const dateStr = d => d.toISOString().slice(0, 10);           // "YYYY-MM-DD"
+const dateStr = d => d.toISOString().slice(0, 10);
 const today = () => dateStr(new Date());
 const addDays = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return dateStr(d); };
 const dayLabel = iso => { const d = new Date(iso + 'T12:00:00'); const wd = d.toLocaleDateString(undefined, { weekday: 'short' }); return `${wd} ${d.getMonth()+1}/${d.getDate()}`; };
@@ -401,12 +488,11 @@ const STORAGE_KEY = 'chore-tracker-data';
 function defaultData() {
   return {
     rooms: [
-      { id: uid(), name: 'Kitchen',   desc: 'Wipe counters, sweep, dishes', cleanDays: 2 },
-      { id: uid(), name: 'Bathroom',  desc: 'Toilet, sink, mirror',         cleanDays: 3 },
-      { id: uid(), name: 'Living Room', desc: 'Vacuum, dust, tidy up',      cleanDays: 4 },
+      { id: uid(), name: 'Kitchen',   desc: 'Wipe counters, sweep, dishes', cleanDays: 2, tasks: [] },
+      { id: uid(), name: 'Bathroom',  desc: 'Toilet, sink, mirror',         cleanDays: 3, tasks: [] },
+      { id: uid(), name: 'Living Room', desc: 'Vacuum, dust, tidy up',      cleanDays: 4, tasks: [] },
     ],
     users: ['Alice', 'Bob'],
-    // entries: { "YYYY-MM-DD": { roomId: { cleaned: true, user: "Alice" } } }
     entries: {},
     settings: { daysShown: 14, historyDays: 30 },
     selectedUser: null,
@@ -417,105 +503,165 @@ let DATA;
 function load() {
   try { DATA = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch {}
   if (!DATA || !DATA.rooms) DATA = defaultData();
-  // Migration: ensure settings exist
   if (!DATA.settings) DATA.settings = { daysShown: 14, historyDays: 30 };
+  // Migration: ensure all rooms have tasks array
+  for (const room of DATA.rooms) {
+    if (!room.tasks) room.tasks = [];
+  }
 }
 function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }
+
+// ── View State ───────────────────────────────────────────────
+let viewMode = 'room';      // 'room' | 'tasktype'
+let drillDown = null;        // null | { type:'room', roomId } | { type:'tasktype', taskLabel }
+
+// ── Task Helpers ─────────────────────────────────────────────
+function roomHasTasks(room) { return room.tasks && room.tasks.length > 0; }
+
+function getAllTaskTypes() {
+  const map = {};
+  for (const room of DATA.rooms) {
+    if (!roomHasTasks(room)) continue;
+    for (const task of room.tasks) {
+      if (!map[task.label]) map[task.label] = { label: task.label, rooms: [] };
+      map[task.label].rooms.push({ roomId: room.id, roomName: room.name, taskId: task.id, cleanDays: task.cleanDays });
+    }
+  }
+  return Object.values(map);
+}
+
+function getRoomsForTaskType(label) {
+  const result = [];
+  for (const room of DATA.rooms) {
+    if (!roomHasTasks(room)) continue;
+    const task = room.tasks.find(t => t.label === label);
+    if (task) result.push({ room, task });
+  }
+  return result;
+}
 
 // ── Date Range ───────────────────────────────────────────────
 function visibleDates() {
   const n = DATA.settings.daysShown || 14;
   const t = today();
   const dates = [];
-  // Center on today: roughly half past, half future
   const futureDays = Math.floor(n / 2);
   const pastDays = n - 1 - futureDays;
-  for (let i = -pastDays; i <= futureDays; i++) {
-    dates.push(addDays(t, i));
-  }
+  for (let i = -pastDays; i <= futureDays; i++) dates.push(addDays(t, i));
   return dates;
 }
 
-// ── Cell state logic ─────────────────────────────────────────
-// Returns { state, daysSinceCleaned, daysOverdue, ratio } for colour gradient
+// ── Cell State Logic ─────────────────────────────────────────
+// Simple room cell info (rooms without tasks — original behavior)
 function cellInfo(room, date) {
   const t = today();
-  if (date > t) {
-    // Future: project status forward from today's state
-    return cellInfoFuture(room, date);
-  }
-
-  // Was this room cleaned on this exact date?
+  if (date > t) return cellInfoFuture(room, date);
   const entry = DATA.entries[date]?.[room.id];
   if (entry?.cleaned) return { state: 'cleaned', daysSince: 0, daysOverdue: 0, ratio: 0 };
-
-  // Find most recent cleaning on or before this date (search back up to 120d)
   for (let i = 1; i <= 120; i++) {
     const prev = addDays(date, -i);
     if (DATA.entries[prev]?.[room.id]?.cleaned) {
       const daysSince = i;
       const daysOverdue = daysSince - room.cleanDays;
-      return {
-        state: daysOverdue >= 0 ? 'overdue' : 'clean',
-        daysSince,
-        daysOverdue: Math.max(0, daysOverdue),
-        ratio: daysSince / room.cleanDays   // 0→1 = green→neutral, >1 = red
-      };
+      return { state: daysOverdue >= 0 ? 'overdue' : 'clean', daysSince, daysOverdue: Math.max(0, daysOverdue), ratio: daysSince / room.cleanDays };
     }
   }
-  // Never cleaned
   return { state: 'overdue', daysSince: 999, daysOverdue: 999, ratio: 3 };
 }
 
 function cellInfoFuture(room, date) {
-  // Project forward: find the most recent cleaning on or before today
   const t = today();
   const daysFromToday = Math.round((new Date(date + 'T12:00:00') - new Date(t + 'T12:00:00')) / 86400000);
-  // Get today's info and add the future offset
   for (let i = 0; i <= 120; i++) {
     const prev = addDays(t, -i);
     if (DATA.entries[prev]?.[room.id]?.cleaned) {
       const daysSince = i + daysFromToday;
       const daysOverdue = daysSince - room.cleanDays;
-      return {
-        state: daysOverdue >= 0 ? 'overdue' : 'clean',
-        daysSince,
-        daysOverdue: Math.max(0, daysOverdue),
-        ratio: daysSince / room.cleanDays,
-        future: true
-      };
+      return { state: daysOverdue >= 0 ? 'overdue' : 'clean', daysSince, daysOverdue: Math.max(0, daysOverdue), ratio: daysSince / room.cleanDays, future: true };
     }
   }
   return { state: 'overdue', daysSince: 999, daysOverdue: 999, ratio: 3, future: true };
 }
 
-// Keep old API for history chart
-function cellState(room, date) {
-  return cellInfo(room, date).state;
+// Task-level cell info (specific room+task combination)
+function taskCellInfo(room, task, date) {
+  const t = today();
+  if (date > t) return taskCellInfoFuture(room, task, date);
+  const entry = DATA.entries[date]?.[room.id]?.tasks?.[task.id];
+  if (entry?.cleaned) return { state: 'cleaned', daysSince: 0, daysOverdue: 0, ratio: 0 };
+  for (let i = 1; i <= 120; i++) {
+    const prev = addDays(date, -i);
+    if (DATA.entries[prev]?.[room.id]?.tasks?.[task.id]?.cleaned) {
+      const daysSince = i;
+      const daysOverdue = daysSince - task.cleanDays;
+      return { state: daysOverdue >= 0 ? 'overdue' : 'clean', daysSince, daysOverdue: Math.max(0, daysOverdue), ratio: daysSince / task.cleanDays };
+    }
+  }
+  return { state: 'overdue', daysSince: 999, daysOverdue: 999, ratio: 3 };
 }
 
-function cleanedBy(room, date) {
-  return DATA.entries[date]?.[room.id]?.user || null;
+function taskCellInfoFuture(room, task, date) {
+  const t = today();
+  const daysFromToday = Math.round((new Date(date + 'T12:00:00') - new Date(t + 'T12:00:00')) / 86400000);
+  for (let i = 0; i <= 120; i++) {
+    const prev = addDays(t, -i);
+    if (DATA.entries[prev]?.[room.id]?.tasks?.[task.id]?.cleaned) {
+      const daysSince = i + daysFromToday;
+      const daysOverdue = daysSince - task.cleanDays;
+      return { state: daysOverdue >= 0 ? 'overdue' : 'clean', daysSince, daysOverdue: Math.max(0, daysOverdue), ratio: daysSince / task.cleanDays, future: true };
+    }
+  }
+  return { state: 'overdue', daysSince: 999, daysOverdue: 999, ratio: 3, future: true };
 }
+
+// Room aggregate cell info (across its tasks)
+function roomAggCellInfo(room, date) {
+  if (!roomHasTasks(room)) return cellInfo(room, date);
+  const total = room.tasks.length;
+  let cleanCount = 0, worstRatio = 0, anyFuture = date > today();
+  for (const task of room.tasks) {
+    const info = taskCellInfo(room, task, date);
+    if (info.ratio < 1 || info.state === 'cleaned') cleanCount++;
+    worstRatio = Math.max(worstRatio, info.ratio);
+  }
+  return { state: cleanCount === total ? 'clean' : 'overdue', cleaned: cleanCount, total, ratio: worstRatio, fraction: `${cleanCount}/${total}`, isAggregate: true, future: anyFuture };
+}
+
+// Task type aggregate cell info (across rooms)
+function taskTypeAggCellInfo(taskLabel, date) {
+  const roomTasks = getRoomsForTaskType(taskLabel);
+  const total = roomTasks.length;
+  let cleanCount = 0, worstRatio = 0, anyFuture = date > today();
+  for (const { room, task } of roomTasks) {
+    const info = taskCellInfo(room, task, date);
+    if (info.ratio < 1 || info.state === 'cleaned') cleanCount++;
+    worstRatio = Math.max(worstRatio, info.ratio);
+  }
+  return { state: cleanCount === total ? 'clean' : 'overdue', cleaned: cleanCount, total, ratio: worstRatio, fraction: `${cleanCount}/${total}`, isAggregate: true, future: anyFuture };
+}
+
+// Effective cell info (aggregate or simple)
+function effectiveCellInfo(room, date) {
+  return roomHasTasks(room) ? roomAggCellInfo(room, date) : cellInfo(room, date);
+}
+
+function cellState(room, date) { return effectiveCellInfo(room, date).state; }
+function cleanedBy(room, date) { return DATA.entries[date]?.[room.id]?.user || null; }
+function taskCleanedBy(roomId, taskId, date) { return DATA.entries[date]?.[roomId]?.tasks?.[taskId]?.user || null; }
 
 // ── Unique user prefixes ─────────────────────────────────────
-// Returns a map { userName: shortestUniquePrefix } so users with the same
-// first letter get enough characters to be distinguishable in the grid.
 function userPrefixes() {
   const users = DATA.users;
   const map = {};
   for (const u of users) {
     let len = 1;
-    while (len < u.length && users.some(o => o !== u && o.slice(0, len).toLowerCase() === u.slice(0, len).toLowerCase())) {
-      len++;
-    }
+    while (len < u.length && users.some(o => o !== u && o.slice(0, len).toLowerCase() === u.slice(0, len).toLowerCase())) len++;
     map[u] = u.slice(0, len).toUpperCase();
   }
   return map;
 }
 
 // ── Color gradient helper ────────────────────────────────────
-// ratio: 0 = just cleaned (bright green), 1 = due (neutral), >1 = overdue, ≥2 = bright red
 let _neutralCache = null;
 function getNeutral() {
   if (_neutralCache) return _neutralCache;
@@ -533,24 +679,20 @@ function cellColor(ratio, isFuture) {
   const opacity = isFuture ? 0.55 : 1;
   const n = getNeutral();
   if (ratio <= 0) {
-    // Just cleaned: bright green
     return `rgba(46,204,113,${opacity})`;
   } else if (ratio < 1) {
-    // Clean window: lerp bright green → neutral
     const t = ratio;
     const r = Math.round(46 + (n.r - 46) * t);
     const g = Math.round(204 + (n.g - 204) * t);
     const b = Math.round(113 + (n.b - 113) * t);
     return `rgba(${r},${g},${b},${opacity})`;
   } else if (ratio < 2) {
-    // Overdue: lerp neutral → bright red
     const t = ratio - 1;
     const r = Math.round(n.r + (231 - n.r) * t);
     const g = Math.round(n.g + (76 - n.g) * t);
     const b = Math.round(n.b + (60 - n.b) * t);
     return `rgba(${r},${g},${b},${opacity})`;
   } else {
-    // Critically overdue (2x+): solid bright red
     return `rgba(231,76,60,${opacity})`;
   }
 }
@@ -561,54 +703,210 @@ function cellTextColor(ratio) {
   return ratio < 0.6 ? '#fff' : ratio < 1.2 ? '#ccc' : '#ffcccc';
 }
 
-// ── Sort rooms by days-until-due (most urgent first) ─────────
-// daysUntilDue = cleanDays − daysSince. Negative = overdue. Ascending puts most overdue on top.
+// ── Sort ─────────────────────────────────────────────────────
 function daysUntilDue(room) {
+  if (roomHasTasks(room)) {
+    let worst = Infinity;
+    for (const task of room.tasks) {
+      const info = taskCellInfo(room, task, today());
+      const dud = task.cleanDays - (info.daysSince ?? 0);
+      if (dud < worst) worst = dud;
+    }
+    return worst === Infinity ? -999 : worst;
+  }
   const info = cellInfo(room, today());
-  if (info.daysSince === 999) return -999;           // never cleaned → top
+  if (info.daysSince === 999) return -999;
   return room.cleanDays - (info.daysSince ?? 0);
 }
+
 function sortedRooms() {
   return [...DATA.rooms].sort((a, b) => {
     const da = daysUntilDue(a), db = daysUntilDue(b);
     if (da !== db) return da - db;
-    return a.cleanDays - b.cleanDays;  // shorter cycle = dirtier → higher
+    return (a.cleanDays || 1) - (b.cleanDays || 1);
   });
 }
 
-// ── Render Table ─────────────────────────────────────────────
+function sortedTaskTypes() {
+  return getAllTaskTypes().sort((a, b) => {
+    return taskTypeDaysUntilDue(a.label) - taskTypeDaysUntilDue(b.label);
+  });
+}
+
+function taskTypeDaysUntilDue(taskLabel) {
+  let worst = Infinity;
+  for (const { room, task } of getRoomsForTaskType(taskLabel)) {
+    const info = taskCellInfo(room, task, today());
+    const dud = task.cleanDays - (info.daysSince ?? 0);
+    if (dud < worst) worst = dud;
+  }
+  return worst === Infinity ? -999 : worst;
+}
+
+function sortedTasksInRoom(room) {
+  if (!roomHasTasks(room)) return [];
+  return [...room.tasks].sort((a, b) => {
+    const da = a.cleanDays - (taskCellInfo(room, a, today()).daysSince ?? 0);
+    const db = b.cleanDays - (taskCellInfo(room, b, today()).daysSince ?? 0);
+    return da - db;
+  });
+}
+
+function sortedRoomsForTask(taskLabel) {
+  return getRoomsForTaskType(taskLabel).sort((a, b) => {
+    const da = a.task.cleanDays - (taskCellInfo(a.room, a.task, today()).daysSince ?? 0);
+    const db = b.task.cleanDays - (taskCellInfo(b.room, b.task, today()).daysSince ?? 0);
+    return da - db;
+  });
+}
+
+// ── Render ───────────────────────────────────────────────────
 function renderTable(animate) {
   const dates = visibleDates();
   const t = today();
-  const rooms = sortedRooms();
   const prefixes = userPrefixes();
 
-  // Head — Room column uses colspan=3, day columns share the rest equally
-  const dayCols = dates.length;
-  let headHtml = `<colgroup><col><col><col>`;
-  for (let i = 0; i < dayCols; i++) headHtml += `<col>`;
-  headHtml += '</colgroup>';
-  headHtml += '<tr><th colspan=3>Room</th>';
+  renderTableHead(dates, t);
+  updateBackBar();
+
+  if (drillDown) renderDrillDown(dates, t, prefixes);
+  else if (viewMode === 'room') renderRoomView(dates, t, prefixes, animate);
+  else renderTaskTypeView(dates, t, prefixes);
+
+  const todayTh = $('#table-head th.today');
+  if (todayTh) todayTh.scrollIntoView({ inline: 'center', block: 'nearest' });
+}
+
+function renderTableHead(dates, t) {
+  let headHtml = '<colgroup><col><col><col>';
+  for (let i = 0; i < dates.length; i++) headHtml += '<col>';
+  headHtml += '</colgroup><tr><th colspan=3>' + (viewMode === 'tasktype' && !drillDown ? 'Task Type' : 'Room') + '</th>';
   for (const d of dates) {
     const cls = d === t ? ' class="today"' : '';
     headHtml += `<th${cls}>${dayLabel(d)}</th>`;
   }
   headHtml += '</tr>';
   $('#table-head').innerHTML = headHtml;
+}
 
-  // Capture old row positions for FLIP animation
-  const oldPositions = {};
+function updateBackBar() {
+  const bar = $('#back-bar');
+  const bc = $('#breadcrumb');
+  if (!drillDown) { bar.classList.remove('visible'); return; }
+  bar.classList.add('visible');
+  if (drillDown.type === 'room') {
+    const room = DATA.rooms.find(r => r.id === drillDown.roomId);
+    bc.innerHTML = `<strong>${esc(room?.name || '?')}</strong> — tasks`;
+  } else {
+    bc.innerHTML = `<strong>${esc(drillDown.taskLabel)}</strong> — rooms`;
+  }
+}
+
+function renderRoomView(dates, t, prefixes, animate) {
+  const rooms = sortedRooms();
+
+  // FLIP animation prep
+  const oldPos = {};
   if (animate) {
-    for (const tr of $('#table-body').querySelectorAll('tr[data-room-id]')) {
-      oldPositions[tr.dataset.roomId] = tr.getBoundingClientRect().top;
+    for (const tr of $('#table-body').querySelectorAll('tr[data-row-id]'))
+      oldPos[tr.dataset.rowId] = tr.getBoundingClientRect().top;
+  }
+
+  let html = '';
+  for (const room of rooms) {
+    html += `<tr data-row-id="${room.id}" data-room-id="${room.id}">`;
+    html += `<th colspan=3 data-room-id="${room.id}">
+      <span class="room-name">${esc(room.name)}</span>
+      <span class="room-desc">${esc(room.desc)}</span>
+      <span class="room-cycle">${roomHasTasks(room) ? room.tasks.length + ' task' + (room.tasks.length > 1 ? 's' : '') : 'every ' + room.cleanDays + 'd'}</span>
+    </th>`;
+    for (const d of dates) {
+      if (roomHasTasks(room)) {
+        const info = roomAggCellInfo(room, d);
+        const bg = cellColor(info.ratio, info.future);
+        const fg = cellTextColor(info.ratio);
+        const todayCls = d === t ? ' col-today' : '';
+        html += `<td class="cell-aggregate${todayCls}" style="background:${bg};color:${fg}" data-room="${room.id}" data-date="${d}" data-aggregate="room">${info.fraction}</td>`;
+      } else {
+        const info = cellInfo(room, d);
+        const user = cleanedBy(room, d);
+        const isFuture = !!info.future;
+        const bg = cellColor(info.ratio, isFuture);
+        const fg = cellTextColor(info.ratio);
+        const todayCls = d === t ? ' col-today' : '';
+        let label = '';
+        if (info.state === 'cleaned') label = user ? (prefixes[user] || user.charAt(0).toUpperCase()) : '✓';
+        else if (info.daysOverdue > 0) label = `+${info.daysOverdue}`;
+        html += `<td class="${todayCls}" style="background:${bg};color:${fg}" data-room="${room.id}" data-date="${d}">${label}</td>`;
+      }
+    }
+    html += '</tr>';
+  }
+  $('#table-body').innerHTML = html;
+
+  // FLIP animation
+  if (animate && Object.keys(oldPos).length > 0) {
+    for (const tr of $('#table-body').querySelectorAll('tr[data-row-id]')) {
+      const id = tr.dataset.rowId;
+      if (id in oldPos) {
+        const delta = oldPos[id] - tr.getBoundingClientRect().top;
+        if (Math.abs(delta) > 1) {
+          tr.style.transition = 'none';
+          tr.style.transform = `translateY(${delta}px)`;
+          tr.offsetHeight;
+          tr.style.transition = '';
+          tr.style.transform = '';
+        }
+      }
     }
   }
 
-  // Body
-  let bodyHtml = '';
-  for (const room of rooms) {
-    bodyHtml += `<tr data-room-id="${room.id}">`;
-    bodyHtml += `<th colspan=3 data-room-id="${room.id}">
+  // Footer
+  let footHtml = '<tr><th colspan=3>Summary</th>';
+  for (const d of dates) {
+    let clean = 0, total = 0;
+    for (const room of rooms) {
+      if (roomHasTasks(room)) {
+        const info = roomAggCellInfo(room, d);
+        clean += info.cleaned; total += info.total;
+      } else {
+        const s = cellInfo(room, d);
+        if (s.state === 'cleaned' || s.state === 'clean') clean++;
+        total++;
+      }
+    }
+    const todayCls = d === t ? ' col-today' : '';
+    footHtml += `<td class="${todayCls}">${clean}/${total}</td>`;
+  }
+  footHtml += '</tr>';
+  $('#table-foot').innerHTML = footHtml;
+}
+
+function renderTaskTypeView(dates, t, prefixes) {
+  const taskTypes = sortedTaskTypes();
+  const simpleRooms = sortedRooms().filter(r => !roomHasTasks(r));
+
+  let html = '';
+  for (const tt of taskTypes) {
+    html += `<tr data-row-id="tt-${tt.label}">`;
+    html += `<th colspan=3 data-tasktype="${esc(tt.label)}">
+      <span class="room-name">${esc(tt.label)}</span>
+      <span class="room-desc">${tt.rooms.length} room${tt.rooms.length > 1 ? 's' : ''}</span>
+    </th>`;
+    for (const d of dates) {
+      const info = taskTypeAggCellInfo(tt.label, d);
+      const bg = cellColor(info.ratio, info.future);
+      const fg = cellTextColor(info.ratio);
+      const todayCls = d === t ? ' col-today' : '';
+      html += `<td class="cell-aggregate${todayCls}" style="background:${bg};color:${fg}" data-tasktype="${esc(tt.label)}" data-date="${d}" data-aggregate="tasktype">${info.fraction}</td>`;
+    }
+    html += '</tr>';
+  }
+
+  // Simple rooms (no tasks) at the bottom
+  for (const room of simpleRooms) {
+    html += `<tr data-row-id="${room.id}" data-room-id="${room.id}">`;
+    html += `<th colspan=3 data-room-id="${room.id}">
       <span class="room-name">${esc(room.name)}</span>
       <span class="room-desc">${esc(room.desc)}</span>
       <span class="room-cycle">every ${room.cleanDays}d</span>
@@ -621,73 +919,202 @@ function renderTable(animate) {
       const fg = cellTextColor(info.ratio);
       const todayCls = d === t ? ' col-today' : '';
       let label = '';
-      if (info.state === 'cleaned') {
-        label = user ? (prefixes[user] || user.charAt(0).toUpperCase()) : '✓';
-      } else if (info.daysOverdue > 0) {
-        label = `+${info.daysOverdue}`;
-      }
-      bodyHtml += `<td class="${todayCls}" style="background:${bg};color:${fg}" data-room="${room.id}" data-date="${d}" title="${esc(room.name)} — ${dayLabel(d)}">${label}</td>`;
+      if (info.state === 'cleaned') label = user ? (prefixes[user] || user.charAt(0).toUpperCase()) : '✓';
+      else if (info.daysOverdue > 0) label = `+${info.daysOverdue}`;
+      html += `<td class="${todayCls}" style="background:${bg};color:${fg}" data-room="${room.id}" data-date="${d}">${label}</td>`;
     }
-    bodyHtml += '</tr>';
-  }
-  $('#table-body').innerHTML = bodyHtml;
-
-  // FLIP: animate rows to new positions
-  if (animate && Object.keys(oldPositions).length > 0) {
-    for (const tr of $('#table-body').querySelectorAll('tr[data-room-id]')) {
-      const id = tr.dataset.roomId;
-      if (id in oldPositions) {
-        const newTop = tr.getBoundingClientRect().top;
-        const delta = oldPositions[id] - newTop;
-        if (Math.abs(delta) > 1) {
-          tr.style.transition = 'none';
-          tr.style.transform = `translateY(${delta}px)`;
-          // Force reflow then animate
-          tr.offsetHeight;
-          tr.style.transition = '';
-          tr.style.transform = '';
-        }
-      }
-    }
+    html += '</tr>';
   }
 
-  // Footer summary row — clean count per day
+  if (taskTypes.length === 0 && simpleRooms.length === 0) {
+    html = '<tr><td colspan="100" style="text-align:center;color:var(--desc-text);padding:20px">No task types defined. Edit a room to add tasks.</td></tr>';
+  }
+
+  $('#table-body').innerHTML = html;
+
+  // Footer
   let footHtml = '<tr><th colspan=3>Summary</th>';
   for (const d of dates) {
-    let clean = 0;
-    for (const room of rooms) {
+    let clean = 0, total = 0;
+    for (const tt of taskTypes) {
+      const info = taskTypeAggCellInfo(tt.label, d);
+      clean += info.cleaned; total += info.total;
+    }
+    for (const room of simpleRooms) {
       const s = cellInfo(room, d);
       if (s.state === 'cleaned' || s.state === 'clean') clean++;
+      total++;
     }
-    const total = rooms.length;
     const todayCls = d === t ? ' col-today' : '';
     footHtml += `<td class="${todayCls}">${clean}/${total}</td>`;
   }
   footHtml += '</tr>';
   $('#table-foot').innerHTML = footHtml;
+}
 
-  // Scroll so today column is visible (roughly centered)
-  const todayTh = $('#table-head th.today');
-  if (todayTh) todayTh.scrollIntoView({ inline: 'center', block: 'nearest' });
+function renderDrillDown(dates, t, prefixes) {
+  let html = '';
+
+  if (drillDown.type === 'room') {
+    const room = DATA.rooms.find(r => r.id === drillDown.roomId);
+    if (!room || !roomHasTasks(room)) { drillDown = null; renderTable(); return; }
+
+    // Parent aggregate row
+    html += `<tr class="drill-parent" data-room-id="${room.id}">
+      <th colspan=3 data-room-id="${room.id}">
+        <span class="room-name">${esc(room.name)}</span>
+        <span class="room-desc">${esc(room.desc)}</span>
+      </th>`;
+    for (const d of dates) {
+      const info = roomAggCellInfo(room, d);
+      const bg = cellColor(info.ratio, info.future);
+      const fg = cellTextColor(info.ratio);
+      const todayCls = d === t ? ' col-today' : '';
+      html += `<td class="${todayCls}" style="background:${bg};color:${fg}">${info.fraction}</td>`;
+    }
+    html += '</tr>';
+
+    // Task detail rows
+    for (const task of sortedTasksInRoom(room)) {
+      html += `<tr data-room-id="${room.id}" data-task-id="${task.id}">
+        <th colspan=3>
+          <span class="room-name" style="padding-left:16px">› ${esc(task.label)}</span>
+          <span class="room-cycle">every ${task.cleanDays}d</span>
+        </th>`;
+      for (const d of dates) {
+        const info = taskCellInfo(room, task, d);
+        const user = taskCleanedBy(room.id, task.id, d);
+        const isFuture = !!info.future;
+        const bg = cellColor(info.ratio, isFuture);
+        const fg = cellTextColor(info.ratio);
+        const todayCls = d === t ? ' col-today' : '';
+        let label = '';
+        if (info.state === 'cleaned') label = user ? (prefixes[user] || user.charAt(0).toUpperCase()) : '✓';
+        else if (info.daysOverdue > 0) label = `+${info.daysOverdue}`;
+        html += `<td class="${todayCls}" style="background:${bg};color:${fg}" data-room="${room.id}" data-task="${task.id}" data-date="${d}">${label}</td>`;
+      }
+      html += '</tr>';
+    }
+
+  } else if (drillDown.type === 'tasktype') {
+    const taskLabel = drillDown.taskLabel;
+    const roomTasks = sortedRoomsForTask(taskLabel);
+    if (roomTasks.length === 0) { drillDown = null; renderTable(); return; }
+
+    // Parent aggregate row
+    html += `<tr class="drill-parent">
+      <th colspan=3>
+        <span class="room-name">${esc(taskLabel)}</span>
+        <span class="room-desc">${roomTasks.length} room${roomTasks.length > 1 ? 's' : ''}</span>
+      </th>`;
+    for (const d of dates) {
+      const info = taskTypeAggCellInfo(taskLabel, d);
+      const bg = cellColor(info.ratio, info.future);
+      const fg = cellTextColor(info.ratio);
+      const todayCls = d === t ? ' col-today' : '';
+      html += `<td class="${todayCls}" style="background:${bg};color:${fg}">${info.fraction}</td>`;
+    }
+    html += '</tr>';
+
+    // Room detail rows
+    for (const { room, task } of roomTasks) {
+      html += `<tr data-room-id="${room.id}" data-task-id="${task.id}">
+        <th colspan=3 data-room-id="${room.id}">
+          <span class="room-name" style="padding-left:16px">› ${esc(room.name)}</span>
+          <span class="room-cycle">every ${task.cleanDays}d</span>
+        </th>`;
+      for (const d of dates) {
+        const info = taskCellInfo(room, task, d);
+        const user = taskCleanedBy(room.id, task.id, d);
+        const isFuture = !!info.future;
+        const bg = cellColor(info.ratio, isFuture);
+        const fg = cellTextColor(info.ratio);
+        const todayCls = d === t ? ' col-today' : '';
+        let label = '';
+        if (info.state === 'cleaned') label = user ? (prefixes[user] || user.charAt(0).toUpperCase()) : '✓';
+        else if (info.daysOverdue > 0) label = `+${info.daysOverdue}`;
+        html += `<td class="${todayCls}" style="background:${bg};color:${fg}" data-room="${room.id}" data-task="${task.id}" data-date="${d}">${label}</td>`;
+      }
+      html += '</tr>';
+    }
+  }
+
+  $('#table-body').innerHTML = html;
+
+  // Footer
+  let footHtml = '<tr><th colspan=3>Summary</th>';
+  for (const d of dates) {
+    let clean = 0, total = 0;
+    if (drillDown.type === 'room') {
+      const room = DATA.rooms.find(r => r.id === drillDown.roomId);
+      if (room && roomHasTasks(room)) {
+        for (const task of room.tasks) {
+          const info = taskCellInfo(room, task, d);
+          if (info.ratio < 1 || info.state === 'cleaned') clean++;
+          total++;
+        }
+      }
+    } else {
+      for (const { room, task } of getRoomsForTaskType(drillDown.taskLabel)) {
+        const info = taskCellInfo(room, task, d);
+        if (info.ratio < 1 || info.state === 'cleaned') clean++;
+        total++;
+      }
+    }
+    const todayCls = d === t ? ' col-today' : '';
+    footHtml += `<td class="${todayCls}">${clean}/${total}</td>`;
+  }
+  footHtml += '</tr>';
+  $('#table-foot').innerHTML = footHtml;
 }
 
 function esc(s) { const el = document.createElement('span'); el.textContent = s; return el.innerHTML; }
 
 // ── Cell Click ───────────────────────────────────────────────
 $('#table-body').addEventListener('click', e => {
-  const td = e.target.closest('td[data-room][data-date]');
-  if (td) {
-    toggleCell(td.dataset.room, td.dataset.date);
+  // Task detail cell (has data-task): toggle individual task
+  const tdTask = e.target.closest('td[data-room][data-task][data-date]');
+  if (tdTask) {
+    toggleTaskCell(tdTask.dataset.room, tdTask.dataset.task, tdTask.dataset.date);
     return;
   }
+
+  // Aggregate cell: drill down
+  const tdAgg = e.target.closest('td[data-aggregate]');
+  if (tdAgg) {
+    if (tdAgg.dataset.aggregate === 'room') {
+      drillDown = { type: 'room', roomId: tdAgg.dataset.room };
+    } else if (tdAgg.dataset.aggregate === 'tasktype') {
+      drillDown = { type: 'tasktype', taskLabel: tdAgg.dataset.tasktype };
+    }
+    renderTable();
+    return;
+  }
+
+  // Simple room cell (no tasks): toggle room
+  const tdSimple = e.target.closest('td[data-room][data-date]');
+  if (tdSimple && !tdSimple.dataset.aggregate) {
+    toggleCell(tdSimple.dataset.room, tdSimple.dataset.date);
+    return;
+  }
+
+  // Room header: open edit dialog
   const th = e.target.closest('th[data-room-id]');
   if (th) {
     openRoomDialog(th.dataset.roomId);
+    return;
+  }
+
+  // Task type header: drill down
+  const thTT = e.target.closest('th[data-tasktype]');
+  if (thTT) {
+    drillDown = { type: 'tasktype', taskLabel: thTT.dataset.tasktype };
+    renderTable();
+    return;
   }
 });
 
 function toggleCell(roomId, date) {
-  // Allow toggling today and past, not future
   if (date > today()) return;
   if (!DATA.entries[date]) DATA.entries[date] = {};
   const existing = DATA.entries[date][roomId];
@@ -697,12 +1124,51 @@ function toggleCell(roomId, date) {
     DATA.entries[date][roomId] = { cleaned: true, user: DATA.selectedUser || '' };
   }
   save();
-  renderTable(true);  // animate re-sort
+  renderTable(true);
   renderHistory();
+}
+
+function toggleTaskCell(roomId, taskId, date) {
+  if (date > today()) return;
+  if (!DATA.entries[date]) DATA.entries[date] = {};
+  if (!DATA.entries[date][roomId]) DATA.entries[date][roomId] = {};
+  if (!DATA.entries[date][roomId].tasks) DATA.entries[date][roomId].tasks = {};
+
+  const existing = DATA.entries[date][roomId].tasks[taskId];
+  if (existing?.cleaned) {
+    delete DATA.entries[date][roomId].tasks[taskId];
+    if (Object.keys(DATA.entries[date][roomId].tasks).length === 0) delete DATA.entries[date][roomId].tasks;
+    if (Object.keys(DATA.entries[date][roomId]).length === 0) delete DATA.entries[date][roomId];
+  } else {
+    DATA.entries[date][roomId].tasks[taskId] = { cleaned: true, user: DATA.selectedUser || '' };
+  }
+  save();
+  renderTable(true);
+  renderHistory();
+}
+
+// ── View Toggle & Back ───────────────────────────────────────
+$('#btn-view-room').addEventListener('click', () => {
+  if (viewMode === 'room' && !drillDown) return;
+  viewMode = 'room'; drillDown = null;
+  updateViewToggle(); renderTable();
+});
+$('#btn-view-task').addEventListener('click', () => {
+  if (viewMode === 'tasktype' && !drillDown) return;
+  viewMode = 'tasktype'; drillDown = null;
+  updateViewToggle(); renderTable();
+});
+$('#btn-back').addEventListener('click', () => { drillDown = null; renderTable(); });
+
+function updateViewToggle() {
+  $('#btn-view-room').classList.toggle('active', viewMode === 'room');
+  $('#btn-view-task').classList.toggle('active', viewMode === 'tasktype');
 }
 
 // ── Room Dialog ──────────────────────────────────────────────
 let editingRoomId = null;
+let dialogTasks = [];
+
 function openRoomDialog(roomId) {
   editingRoomId = roomId || null;
   const dialog = $('#room-dialog');
@@ -714,15 +1180,57 @@ function openRoomDialog(roomId) {
     $('#room-desc').value = room.desc;
     $('#room-days').value = room.cleanDays;
     $('#room-delete').style.display = '';
+    dialogTasks = room.tasks ? room.tasks.map(t => ({ ...t })) : [];
   } else {
     $('#room-dialog-title').textContent = 'Add Room';
     $('#room-name').value = '';
     $('#room-desc').value = '';
     $('#room-days').value = 3;
     $('#room-delete').style.display = 'none';
+    dialogTasks = [];
   }
+  renderDialogTasks();
   dialog.showModal();
 }
+
+function renderDialogTasks() {
+  const list = $('#task-list');
+  list.innerHTML = dialogTasks.map((t, i) =>
+    `<div class="task-item" data-idx="${i}">
+      <input type="text" value="${esc(t.label)}" data-field="label" placeholder="Task name">
+      <input type="number" value="${t.cleanDays}" data-field="cleanDays" min="1" max="30" title="Clean cycle (days)">
+      <span style="font-size:.65rem;color:var(--cycle-text)">d</span>
+      <button class="remove-task" data-idx="${i}" type="button">✕</button>
+    </div>`
+  ).join('');
+}
+
+// Task list event delegation
+$('#task-list').addEventListener('input', e => {
+  const item = e.target.closest('.task-item');
+  if (!item) return;
+  const idx = parseInt(item.dataset.idx);
+  const field = e.target.dataset.field;
+  if (field === 'label') dialogTasks[idx].label = e.target.value;
+  else if (field === 'cleanDays') dialogTasks[idx].cleanDays = Math.max(1, parseInt(e.target.value) || 1);
+});
+$('#task-list').addEventListener('click', e => {
+  const btn = e.target.closest('.remove-task');
+  if (btn) { dialogTasks.splice(parseInt(btn.dataset.idx), 1); renderDialogTasks(); }
+});
+
+$('#btn-add-task').addEventListener('click', () => {
+  const labelInput = $('#new-task-label');
+  const daysInput = $('#new-task-days');
+  const label = labelInput.value.trim();
+  if (!label) return;
+  dialogTasks.push({ id: uid(), label, cleanDays: Math.max(1, parseInt(daysInput.value) || 3) });
+  labelInput.value = '';
+  daysInput.value = 3;
+  renderDialogTasks();
+});
+$('#new-task-label').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#btn-add-task').click(); } });
+
 $('#btn-add-room').addEventListener('click', () => openRoomDialog(null));
 $('#room-cancel').addEventListener('click', () => $('#room-dialog').close());
 $('#room-save').addEventListener('click', () => {
@@ -730,11 +1238,12 @@ $('#room-save').addEventListener('click', () => {
   if (!name) return;
   const desc = $('#room-desc').value.trim();
   const cleanDays = Math.max(1, parseInt($('#room-days').value) || 3);
+  const tasks = dialogTasks.filter(t => t.label.trim()).map(t => ({ id: t.id, label: t.label.trim(), cleanDays: t.cleanDays }));
   if (editingRoomId) {
     const room = DATA.rooms.find(r => r.id === editingRoomId);
-    if (room) { room.name = name; room.desc = desc; room.cleanDays = cleanDays; }
+    if (room) { room.name = name; room.desc = desc; room.cleanDays = cleanDays; room.tasks = tasks; }
   } else {
-    DATA.rooms.push({ id: uid(), name, desc, cleanDays });
+    DATA.rooms.push({ id: uid(), name, desc, cleanDays, tasks });
   }
   save(); renderTable(); renderHistory();
   $('#room-dialog').close();
@@ -742,10 +1251,8 @@ $('#room-save').addEventListener('click', () => {
 $('#room-delete').addEventListener('click', () => {
   if (editingRoomId && confirm('Delete this room?')) {
     DATA.rooms = DATA.rooms.filter(r => r.id !== editingRoomId);
-    // Clean entries
-    for (const d of Object.keys(DATA.entries)) {
-      delete DATA.entries[d]?.[editingRoomId];
-    }
+    for (const d of Object.keys(DATA.entries)) delete DATA.entries[d]?.[editingRoomId];
+    if (drillDown?.type === 'room' && drillDown.roomId === editingRoomId) drillDown = null;
     save(); renderTable(); renderHistory();
     $('#room-dialog').close();
   }
@@ -784,6 +1291,7 @@ $('#settings-import-file').addEventListener('change', e => {
       const imported = JSON.parse(reader.result);
       if (imported.rooms && imported.entries) {
         DATA = imported;
+        for (const room of DATA.rooms) { if (!room.tasks) room.tasks = []; }
         applyTheme();
         save(); renderTable(); renderUsers(); renderSettingsUsers(); renderHistory();
         $('#settings-dialog').close();
@@ -796,7 +1304,6 @@ $('#settings-import-file').addEventListener('change', e => {
 
 // ── Users ────────────────────────────────────────────────────
 function renderUsers() {
-  // Top bar: selectable chips only (no ✕)
   const list = $('#user-list');
   list.innerHTML = DATA.users.map(u =>
     `<span class="user-chip${DATA.selectedUser === u ? ' selected' : ''}" data-user="${esc(u)}">${esc(u)}</span>`
@@ -843,14 +1350,22 @@ $('#new-user-input').addEventListener('keydown', e => { if (e.key === 'Enter') a
 function computeHistory() {
   const days = DATA.settings.historyDays || 30;
   const t = today();
-  const result = [];                     // [{ date, clean, overdue }]
+  const result = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = addDays(t, -i);
     let clean = 0, overdue = 0;
     for (const room of DATA.rooms) {
-      const s = cellState(room, d);
-      if (s === 'cleaned' || s === 'clean') clean++;
-      else if (s === 'overdue') overdue++;
+      if (roomHasTasks(room)) {
+        for (const task of room.tasks) {
+          const info = taskCellInfo(room, task, d);
+          if (info.state === 'cleaned' || info.ratio < 1) clean++;
+          else overdue++;
+        }
+      } else {
+        const s = cellInfo(room, d);
+        if (s.state === 'cleaned' || s.state === 'clean') clean++;
+        else if (s.state === 'overdue') overdue++;
+      }
     }
     result.push({ date: d, clean, overdue });
   }
@@ -865,25 +1380,23 @@ function renderHistory() {
   const rect = canvas.getBoundingClientRect();
   const W = rect.width;
   const H = rect.height;
-  if (W < 10 || H < 5) return;           // not visible yet
+  if (W < 10 || H < 5) return;
   canvas.width = W * dpr; canvas.height = H * dpr;
   canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
   ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, W, H);
 
-  const maxRooms = DATA.rooms.length || 1;
+  let maxItems = 0;
+  for (const room of DATA.rooms) maxItems += roomHasTasks(room) ? room.tasks.length : 1;
+  maxItems = maxItems || 1;
+
   const pad = 1;
-
-  // Build "clean ratio" series: 1 = all clean, 0 = all overdue
-  const pts = history.map(h => h.clean / maxRooms);
-
-  // Draw filled area + line sparkline
+  const pts = history.map(h => h.clean / maxItems);
   const stepX = (W - pad * 2) / Math.max(pts.length - 1, 1);
   const yFor = v => pad + (1 - v) * (H - pad * 2);
 
-  // Gradient fill under the line
-  const grad = ctx.createLinearGradient(0, 0, 0, H);
   const cs = getComputedStyle(document.documentElement);
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
   grad.addColorStop(0, cs.getPropertyValue('--spark-fill0').trim());
   grad.addColorStop(1, cs.getPropertyValue('--spark-fill1').trim());
   ctx.beginPath();
@@ -894,7 +1407,6 @@ function renderHistory() {
   ctx.fillStyle = grad;
   ctx.fill();
 
-  // Line
   ctx.beginPath();
   pts.forEach((v, i) => {
     const x = pad + i * stepX, y = yFor(v);
@@ -905,8 +1417,7 @@ function renderHistory() {
   ctx.lineJoin = 'round';
   ctx.stroke();
 
-  // Overdue line (inverted)
-  const optsRed = history.map(h => h.overdue / maxRooms);
+  const optsRed = history.map(h => h.overdue / maxItems);
   ctx.beginPath();
   optsRed.forEach((v, i) => {
     const x = pad + i * stepX, y = H - pad - v * (H - pad * 2);
@@ -916,49 +1427,79 @@ function renderHistory() {
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  // Dot for today (last point)
   const lastX = pad + (pts.length - 1) * stepX;
   const lastY = yFor(pts[pts.length - 1]);
   ctx.beginPath(); ctx.arc(lastX, lastY, 2.5, 0, Math.PI * 2);
   ctx.fillStyle = cs.getPropertyValue('--spark-line').trim(); ctx.fill();
 
-  // Sunday tick marks — full height lines
   ctx.strokeStyle = cs.getPropertyValue('--spark-sun').trim();
   ctx.lineWidth = 1;
   history.forEach((h, i) => {
-    const dow = new Date(h.date + 'T12:00:00').getDay(); // 0 = Sunday
+    const dow = new Date(h.date + 'T12:00:00').getDay();
     if (dow === 0) {
       const x = Math.round(pad + i * stepX) + 0.5;
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
     }
   });
 
-  // Update sparkline label
   $('#history-label').textContent = `${DATA.settings.historyDays}-day History`;
-
-  // Summary text
   const last = history[history.length - 1];
   const totalClean = history.reduce((s, h) => s + h.clean, 0);
   const totalOverdue = history.reduce((s, h) => s + h.overdue, 0);
   $('#history-summary').textContent =
-    `${last?.clean || 0}✓ ${last?.overdue || 0}✗ · ${totalClean}/${totalClean + totalOverdue} room-days`;
+    `${last?.clean || 0}✓ ${last?.overdue || 0}✗ · ${totalClean}/${totalClean + totalOverdue} task-days`;
 }
 
 // ── Tooltip on hover/long-press ──────────────────────────────
 $('#table-body').addEventListener('pointerover', e => {
-  const td = e.target.closest('td[data-room][data-date]');
+  const td = e.target.closest('td');
   if (!td) { $('#cell-tooltip').style.display = 'none'; return; }
-  const room = DATA.rooms.find(r => r.id === td.dataset.room);
-  if (!room) return;
-  const user = cleanedBy(room, td.dataset.date);
-  const info = cellInfo(room, td.dataset.date);
-  let stateLabel;
-  if (info.state === 'cleaned') stateLabel = 'Cleaned today';
-  else if (info.daysOverdue > 0) stateLabel = `Overdue by ${info.daysOverdue}d`;
-  else if (info.daysSince > 0) stateLabel = `Clean (${info.daysSince}d ago, due in ${room.cleanDays - info.daysSince}d)`;
-  else stateLabel = 'Not yet cleaned';
-  if (info.future) stateLabel = 'Projected: ' + stateLabel;
-  const tip = `${room.name} — ${dayLabel(td.dataset.date)}\n${stateLabel}${user ? '\nBy: ' + user : ''}`;
+
+  let tip = '';
+
+  // Task detail cell
+  if (td.dataset.room && td.dataset.task && td.dataset.date) {
+    const room = DATA.rooms.find(r => r.id === td.dataset.room);
+    const task = room?.tasks?.find(t => t.id === td.dataset.task);
+    if (!room || !task) return;
+    const info = taskCellInfo(room, task, td.dataset.date);
+    const user = taskCleanedBy(room.id, task.id, td.dataset.date);
+    let stateLabel;
+    if (info.state === 'cleaned') stateLabel = 'Cleaned today';
+    else if (info.daysOverdue > 0) stateLabel = `Overdue by ${info.daysOverdue}d`;
+    else if (info.daysSince > 0) stateLabel = `Clean (${info.daysSince}d ago, due in ${task.cleanDays - info.daysSince}d)`;
+    else stateLabel = 'Not yet cleaned';
+    if (info.future) stateLabel = 'Projected: ' + stateLabel;
+    tip = room.name + ' › ' + task.label + ' — ' + dayLabel(td.dataset.date) + '\n' + stateLabel + (user ? '\nBy: ' + user : '');
+
+  // Aggregate room cell
+  } else if (td.dataset.aggregate === 'room' && td.dataset.room && td.dataset.date) {
+    const room = DATA.rooms.find(r => r.id === td.dataset.room);
+    if (!room) return;
+    const info = roomAggCellInfo(room, td.dataset.date);
+    tip = room.name + ' — ' + dayLabel(td.dataset.date) + '\n' + info.fraction + ' tasks clean\nTap to see details';
+
+  // Aggregate task type cell
+  } else if (td.dataset.aggregate === 'tasktype' && td.dataset.tasktype && td.dataset.date) {
+    const info = taskTypeAggCellInfo(td.dataset.tasktype, td.dataset.date);
+    tip = td.dataset.tasktype + ' — ' + dayLabel(td.dataset.date) + '\n' + info.fraction + ' rooms clean\nTap to see details';
+
+  // Simple room cell
+  } else if (td.dataset.room && td.dataset.date) {
+    const room = DATA.rooms.find(r => r.id === td.dataset.room);
+    if (!room) return;
+    const info = cellInfo(room, td.dataset.date);
+    const user = cleanedBy(room, td.dataset.date);
+    let stateLabel;
+    if (info.state === 'cleaned') stateLabel = 'Cleaned today';
+    else if (info.daysOverdue > 0) stateLabel = `Overdue by ${info.daysOverdue}d`;
+    else if (info.daysSince > 0) stateLabel = `Clean (${info.daysSince}d ago, due in ${room.cleanDays - info.daysSince}d)`;
+    else stateLabel = 'Not yet cleaned';
+    if (info.future) stateLabel = 'Projected: ' + stateLabel;
+    tip = room.name + ' — ' + dayLabel(td.dataset.date) + '\n' + stateLabel + (user ? '\nBy: ' + user : '');
+  }
+
+  if (!tip) { $('#cell-tooltip').style.display = 'none'; return; }
   const tt = $('#cell-tooltip');
   tt.textContent = tip; tt.style.whiteSpace = 'pre-line';
   tt.style.display = 'block';
@@ -990,17 +1531,15 @@ gc();
 renderTable();
 renderUsers();
 renderHistory();
+updateViewToggle();
 
-// Refresh at midnight
 setInterval(() => { renderTable(); renderHistory(); }, 60_000);
-
-// Resize chart on window resize
 window.addEventListener('resize', () => { renderHistory(); });
 
-// Register service worker for offline PWA support
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
+
 </script>
 </body>
 </html>
