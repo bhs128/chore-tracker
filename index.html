@@ -509,7 +509,7 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
 // ── Helpers ──────────────────────────────────────────────────
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
-const dateStr = d => d.toISOString().slice(0, 10);
+const dateStr = d => { const y = d.getFullYear(); const m = String(d.getMonth()+1).padStart(2,'0'); const day = String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; };
 const today = () => dateStr(new Date());
 const addDays = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return dateStr(d); };
 const dayLabel = iso => { const d = new Date(iso + 'T12:00:00'); const wd = d.toLocaleDateString(undefined, { weekday: 'short' }); return `${wd} ${d.getMonth()+1}/${d.getDate()}`; };
