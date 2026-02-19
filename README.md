@@ -36,7 +36,8 @@ A single-page, open-source household chore dashboard designed for always-on tabl
 ### Technical
 
 - **PWA / Installable** — manifest + service worker for "Add to Home Screen" and full offline support
-- **100% client-side** — all data lives in `localStorage`, nothing leaves your browser
+- **Offline-first** — all data lives in `localStorage` by default; nothing leaves your browser unless you opt in to sync
+- **Optional multi-device sync** — point any number of browsers at a lightweight Python sync server to share data across tablets/phones on the same network, with real-time WebSocket push updates
 - **Zero dependencies** — single HTML file, no build step, no frameworks
 - **Self-hosted Poppins font** — three weights (400/600/700) bundled as woff2 for offline use
 - **Auto-refresh** — table and history chart re-render every 60 seconds to handle day rollover
@@ -50,6 +51,36 @@ Just open `index.html` in any modern browser, or serve it locally:
 python3 -m http.server 8765
 # open http://localhost:8765
 ```
+
+### Multi-Device Sync (optional)
+
+To share chore data across multiple tablets/phones on the same network:
+
+```bash
+# One-time setup
+pip install websockets
+
+# Start the sync server
+python3 server/server.py
+# → REST:      http://0.0.0.0:8780/data
+# → WebSocket: ws://0.0.0.0:8781
+```
+
+Then on each device, open ⚙ Settings and enter the server URL (e.g. `http://192.168.1.50:8780`). A green dot in the top bar confirms a live connection. Data syncs instantly via WebSocket; if the connection drops, the app continues working offline from localStorage and re-syncs when the server is reachable again.
+
+**Server options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--port` | `8780` | Port for REST API (WebSocket listens on port+1) |
+| `--data` | `chore-data.json` | Path to the JSON data file |
+
+**Architecture:**
+- `GET /data` — fetch the full data blob (REST, port 8780)
+- `PUT /data` — save the full data blob; server stamps a `_version` field (REST, port 8780)
+- `ws://:8781` — server broadcasts `data-changed` to all connected clients on every PUT
+- Clients write to localStorage immediately (instant UI), then push to the server in the background
+- Each device’s selected user and theme are kept local (not synced)
 
 For kiosk mode:
 
@@ -77,6 +108,8 @@ manifest.json    — PWA web app manifest
 sw.js            — service worker for offline caching
 fonts/           — self-hosted Poppins woff2 (400, 600, 700)
 icons/           — PWA & favicon icons (16, 32, 192, 512, maskable-512)
+server/          — optional sync server for multi-device use
+  server.py      — REST + WebSocket server (Python 3, one dependency)
 LICENSE          — MIT license
 README.md        — this file
 ```
