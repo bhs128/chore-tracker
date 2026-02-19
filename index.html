@@ -281,6 +281,20 @@ dialog .dialog-actions { display: flex; gap: 8px; margin-top: 16px; justify-cont
   font-size: .75rem; z-index: 100; pointer-events: none; max-width: 200px;
 }
 
+/* ── Sync status indicator ──────────────────────────────────── */
+#sync-status {
+  display: none; flex-shrink: 0; align-items: center; gap: 4px;
+  font-size: .65rem; color: var(--desc-text); white-space: nowrap; cursor: default;
+}
+#sync-status.visible { display: flex; }
+#sync-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #888; transition: background .3s;
+}
+#sync-dot.connected    { background: #2ecc71; }
+#sync-dot.disconnected { background: #e74c3c; }
+#sync-dot.syncing      { background: #f1c40f; }
+
 /* ── Responsive tweaks for smaller tablets ─────────────────── */
 @media (max-width: 900px) {
   #chore-table th, #chore-table td { font-size: .7rem; padding: 4px 2px; min-width: 36px; height: 36px; }
@@ -407,6 +421,12 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
 
     <div class="tb-sep"></div>
 
+    <!-- Sync status -->
+    <div id="sync-status">
+      <span id="sync-dot"></span>
+      <span id="sync-label">Offline</span>
+    </div>
+
     <div class="actions">
       <button id="btn-add-room">✏ Rooms</button>
       <button id="btn-settings">⚙</button>
@@ -484,6 +504,9 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
     <option value="dark">Dark</option>
     <option value="light">Light</option>
   </select>
+  <label for="settings-api-url">Sync server URL <span style="font-weight:400;color:var(--desc-text)">(optional)</span></label>
+  <input id="settings-api-url" type="url" placeholder="e.g. http://192.168.1.50:8780" style="font-size:.78rem">
+  <div style="font-size:.68rem;color:var(--desc-text);margin-top:2px">Leave blank for local-only mode. Enter the URL of a running <code>server.py</code> instance to sync across devices.</div>
   <label>Users</label>
   <div id="settings-user-list"></div>
   <div id="add-user-settings">
@@ -568,16 +591,137 @@ function defaultData() {
 }
 
 let DATA;
-function load() {
-  try { DATA = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch {}
+let _syncPending = false;
+let _ws = null;
+
+function migrateData() {
   if (!DATA || !DATA.rooms) DATA = defaultData();
   if (!DATA.settings) DATA.settings = { daysShown: 14, historyDays: 30 };
-  // Migration: ensure all rooms have tasks array
   for (const room of DATA.rooms) {
     if (!room.tasks) room.tasks = [];
   }
 }
-function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }
+
+function load() {
+  try { DATA = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch {}
+  migrateData();
+}
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA));
+  syncPush();
+}
+
+// ── Sync Layer ───────────────────────────────────────────────
+function getApiUrl() { return (DATA?.settings?.apiUrl || '').replace(/\/+$/, ''); }
+
+function setSyncStatus(state, label) {
+  const el = $('#sync-status');
+  const dot = $('#sync-dot');
+  const lbl = $('#sync-label');
+  if (!getApiUrl()) { el.classList.remove('visible'); return; }
+  el.classList.add('visible');
+  dot.className = '';
+  dot.id = 'sync-dot';
+  dot.classList.add(state);  // connected | disconnected | syncing
+  if (label) lbl.textContent = label;
+}
+
+async function syncPull() {
+  const url = getApiUrl();
+  if (!url) return;
+  setSyncStatus('syncing', 'Syncing…');
+  try {
+    const res = await fetch(url + '/data');
+    if (!res.ok) throw new Error(res.status);
+    const remote = await res.json();
+    if (remote && remote.rooms) {
+      // Preserve local-only settings (apiUrl, theme, selectedUser)
+      const localApiUrl = DATA.settings?.apiUrl;
+      const localTheme = DATA.settings?.theme;
+      const localSelectedUser = DATA.selectedUser;
+      DATA = remote;
+      migrateData();
+      if (localApiUrl) DATA.settings.apiUrl = localApiUrl;
+      if (localTheme && !remote.settings?.theme) DATA.settings.theme = localTheme;
+      if (localSelectedUser) DATA.selectedUser = localSelectedUser;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA));
+    }
+    setSyncStatus('connected', 'Synced');
+  } catch (e) {
+    setSyncStatus('disconnected', 'Offline');
+  }
+}
+
+function syncPush() {
+  const url = getApiUrl();
+  if (!url) return;
+  if (_syncPending) return;  // debounce
+  _syncPending = true;
+  setSyncStatus('syncing', 'Saving…');
+  // Strip local-only fields before sending
+  const payload = JSON.parse(JSON.stringify(DATA));
+  delete payload.selectedUser;  // per-device preference
+  fetch(url + '/data', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).then(res => {
+    _syncPending = false;
+    if (res.ok) {
+      setSyncStatus('connected', 'Synced');
+    } else {
+      setSyncStatus('disconnected', 'Sync error');
+    }
+  }).catch(() => {
+    _syncPending = false;
+    setSyncStatus('disconnected', 'Offline');
+  });
+}
+
+// ── WebSocket (real-time push from server) ───────────────────
+function connectWebSocket() {
+  const url = getApiUrl();
+  if (!url) { if (_ws) { _ws.close(); _ws = null; } return; }
+  if (_ws) return;  // already connected
+  // WS runs on REST port + 1
+  const parsed = new URL(url);
+  const wsPort = parseInt(parsed.port || (parsed.protocol === 'https:' ? 443 : 80)) + 1;
+  const wsUrl = 'ws://' + parsed.hostname + ':' + wsPort;
+  try {
+    const ws = new WebSocket(wsUrl);
+    ws.onopen = () => {
+      _ws = ws;
+      setSyncStatus('connected', 'Live');
+    };
+    ws.onmessage = async (evt) => {
+      try {
+        const msg = JSON.parse(evt.data);
+        if (msg.type === 'data-changed' && msg.version !== DATA._version) {
+          await syncPull();
+          renderTable(); renderUsers(); renderHistory();
+        }
+      } catch {}
+    };
+    ws.onclose = () => {
+      _ws = null;
+      if (getApiUrl()) {
+        setSyncStatus('disconnected', 'Reconnecting…');
+        setTimeout(connectWebSocket, 5000);
+      }
+    };
+    ws.onerror = () => { ws.close(); };
+  } catch {
+    _ws = null;
+    setTimeout(connectWebSocket, 5000);
+  }
+}
+
+async function syncInit() {
+  if (!getApiUrl()) return;
+  await syncPull();
+  connectWebSocket();
+}
 
 // ── View State ───────────────────────────────────────────────
 let viewMode = 'room';      // 'room' | 'tasktype'
@@ -1389,16 +1533,25 @@ $('#btn-settings').addEventListener('click', () => {
   $('#settings-days-shown').value = DATA.settings.daysShown;
   $('#settings-history-days').value = DATA.settings.historyDays;
   $('#settings-theme').value = DATA.settings.theme || 'dark';
+  $('#settings-api-url').value = DATA.settings.apiUrl || '';
   renderSettingsUsers();
   $('#settings-dialog').showModal();
 });
 $('#settings-close').addEventListener('click', () => $('#settings-dialog').close());
-$('#settings-save').addEventListener('click', () => {
+$('#settings-save').addEventListener('click', async () => {
   DATA.settings.daysShown = Math.max(5, parseInt($('#settings-days-shown').value) || 14);
   DATA.settings.historyDays = Math.max(7, parseInt($('#settings-history-days').value) || 30);
   DATA.settings.theme = $('#settings-theme').value;
+  const newApiUrl = $('#settings-api-url').value.trim().replace(/\/+$/, '');
+  const apiChanged = newApiUrl !== (DATA.settings.apiUrl || '');
+  DATA.settings.apiUrl = newApiUrl || undefined;
   applyTheme();
   save(); renderTable(); renderHistory();
+  if (apiChanged) {
+    if (_ws) { _ws.close(); _ws = null; }
+    await syncInit();
+    renderTable(); renderUsers(); renderHistory();
+  }
   $('#settings-dialog').close();
 });
 $('#settings-export').addEventListener('click', () => {
@@ -1668,7 +1821,15 @@ renderUsers();
 renderHistory();
 updateViewToggle();
 
-setInterval(() => { renderTable(); renderHistory(); }, 60_000);
+// Kick off remote sync (non-blocking — UI is already rendered from localStorage)
+syncInit().then(() => { renderTable(); renderUsers(); renderHistory(); });
+
+setInterval(async () => {
+  if (getApiUrl()) {
+    await syncPull();
+  }
+  renderTable(); renderHistory();
+}, 60_000);
 window.addEventListener('resize', () => { renderHistory(); });
 
 if ('serviceWorker' in navigator) {
