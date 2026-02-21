@@ -3,28 +3,53 @@
 Chore Tracker — Sync Server (REST + WebSocket)
 
 A lightweight data-sync server that enables multiple devices to share the same
-chore-tracker state.  Serves two purposes:
+chore-tracker state.  Serves three purposes:
 
   1. REST API   — GET /data  and  PUT /data  for reading/writing the full JSON blob
-  2. WebSocket  — /ws  for real-time push notifications when data changes
+  2. WebSocket  — real-time push notifications when data changes (port+1)
+  3. Static     — serves index.html, manifest, SW, fonts, and icons so clients
+                  only need to visit http://<host>:<port>
 
-Dependencies:  pip install websockets
-Usage:         python3 server.py [--port 8780] [--data chore-data.json]
+Dependencies:  pip install websockets  (or: apt install python3-websockets)
+
+Usage:
+  python3 server.py [--port PORT] [--data PATH] [--static DIR]
+
+Options:
+  --port PORT    Port for REST API & static files (default: 8780).
+                 WebSocket listens on PORT+1 (default: 8781).
+  --data PATH    Path to the JSON data file (default: chore-data.json).
+  --static DIR   Directory to serve static files from.
+                 Default: auto-detected parent of server/ (where index.html lives).
+                 Set to empty string ('') to disable static serving.
+
+Examples:
+  python3 server/server.py                        # defaults: port 8780, auto-detect static root
+  python3 server/server.py --port 80              # serve on port 80 (needs root), WS on 81
+  python3 server/server.py --data /tmp/data.json  # custom data file location
+  python3 server/server.py --static ''            # disable static file serving
 """
 
 import argparse
 import asyncio
 import json
+import mimetypes
 import os
 import time
 from http import HTTPStatus
-from urllib.parse import urlparse
+from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 try:
     import websockets
-    from websockets.asyncio.server import serve as ws_serve
+    try:
+        # websockets >= 13.0 (new asyncio API)
+        from websockets.asyncio.server import serve as ws_serve
+    except (ImportError, AttributeError):
+        # websockets 10.x–12.x (legacy API)
+        ws_serve = websockets.serve  # type: ignore[attr-defined]
 except ImportError:
-    print("Missing dependency. Install it with:\n  pip install websockets")
+    print("Missing dependency. Install it with:\n  pip install websockets\nor:\n  apt install python3-websockets")
     raise SystemExit(1)
 
 # ── Defaults ──────────────────────────────────────────────────
@@ -34,6 +59,28 @@ DEFAULT_DATA_FILE = "chore-data.json"
 # ── State ─────────────────────────────────────────────────────
 CLIENTS: set = set()
 data_file: str = DEFAULT_DATA_FILE
+static_root: str = ""  # set in main(); parent of server/ directory
+
+# ── MIME helpers ──────────────────────────────────────────────
+MIME_OVERRIDES = {
+    ".html": "text/html",
+    ".js":   "application/javascript",
+    ".json": "application/json",
+    ".css":  "text/css",
+    ".woff2": "font/woff2",
+    ".png":  "image/png",
+    ".svg":  "image/svg+xml",
+    ".ico":  "image/x-icon",
+    ".webmanifest": "application/manifest+json",
+}
+
+
+def guess_mime(filepath: str) -> str:
+    ext = os.path.splitext(filepath)[1].lower()
+    if ext in MIME_OVERRIDES:
+        return MIME_OVERRIDES[ext]
+    mt, _ = mimetypes.guess_type(filepath)
+    return mt or "application/octet-stream"
 
 
 # ── Persistence helpers ───────────────────────────────────────
@@ -140,6 +187,23 @@ class RESTProtocol(asyncio.Protocol):
                 self._respond(200, resp_body, content_type="application/json", extra_headers=CORS_HEADERS)
                 return
 
+        # ── Static file fallback ────────────────────────────────
+        if method == "GET" and static_root:
+            # Map "/" → "index.html"
+            rel = path.lstrip("/") or "index.html"
+            rel = unquote(rel)
+            # Resolve and ensure it stays inside static_root
+            requested = Path(static_root, rel).resolve()
+            root = Path(static_root).resolve()
+            if str(requested).startswith(str(root)) and requested.is_file():
+                try:
+                    content = requested.read_bytes()
+                    ct = guess_mime(str(requested))
+                    self._respond(200, content, content_type=ct, extra_headers=CORS_HEADERS)
+                    return
+                except OSError:
+                    pass
+
         self._respond(404, "Not found\n", extra_headers=CORS_HEADERS)
 
     def _respond(self, status, body, content_type="text/plain", extra_headers=()):
@@ -159,7 +223,7 @@ class RESTProtocol(asyncio.Protocol):
 
 
 # ── WebSocket handler ─────────────────────────────────────────
-async def ws_handler(websocket):
+async def ws_handler(websocket, path=None):
     """Handle a single WebSocket connection."""
     CLIENTS.add(websocket)
     try:
@@ -189,12 +253,14 @@ async def main(port: int):
 
     # Start WebSocket server on port+1
     ws_port = port + 1
-    async with ws_serve(ws_handler, "0.0.0.0", ws_port):
-        print(f"Chore Tracker sync server running")
-        print(f"  REST:      http://0.0.0.0:{port}/data")
-        print(f"  WebSocket: ws://0.0.0.0:{ws_port}")
-        print(f"  Data file: {os.path.abspath(data_file)}")
-        await asyncio.Future()  # run forever
+    ws_server = await ws_serve(ws_handler, "0.0.0.0", ws_port)
+    print(f"Chore Tracker sync server running")
+    print(f"  REST:      http://0.0.0.0:{port}/data")
+    print(f"  WebSocket: ws://0.0.0.0:{ws_port}")
+    print(f"  Data file: {os.path.abspath(data_file)}")
+    if static_root:
+        print(f"  Static:    http://0.0.0.0:{port}/  → {os.path.abspath(static_root)}")
+    await asyncio.Future()  # run forever
 
 
 if __name__ == "__main__":
@@ -205,6 +271,20 @@ if __name__ == "__main__":
     parser.add_argument(
         "--data", type=str, default=DEFAULT_DATA_FILE, help=f"Path to JSON data file (default: {DEFAULT_DATA_FILE})"
     )
+    parser.add_argument(
+        "--static", type=str, default=None,
+        help="Directory to serve static files from (default: auto-detected parent of server/)."
+             " Set to '' to disable."
+    )
     args = parser.parse_args()
     data_file = args.data
+
+    # Auto-detect static root: parent of the directory containing this script
+    if args.static is None:
+        candidate = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if os.path.isfile(os.path.join(candidate, "index.html")):
+            static_root = candidate
+    elif args.static:
+        static_root = args.static
+
     asyncio.run(main(args.port))

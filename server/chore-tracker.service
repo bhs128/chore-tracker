@@ -1,0 +1,13 @@
+[Unit]
+Description=Chore Tracker Sync Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/chore-tracker
+ExecStart=/usr/bin/python3 /root/chore-tracker/server/server.py --port 80
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
