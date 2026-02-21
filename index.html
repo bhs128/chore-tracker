@@ -506,7 +506,7 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
   </select>
   <label for="settings-api-url">Sync server URL <span style="font-weight:400;color:var(--desc-text)">(optional)</span></label>
   <input id="settings-api-url" type="url" placeholder="e.g. http://192.168.1.50:8780" style="font-size:.78rem">
-  <div style="font-size:.68rem;color:var(--desc-text);margin-top:2px">Leave blank for local-only mode. Enter the URL of a running <code>server.py</code> instance to sync across devices.</div>
+  <div style="font-size:.68rem;color:var(--desc-text);margin-top:2px">Leave blank to auto-detect. When served from <code>server.py</code>, sync uses the current origin automatically. Set a URL to override, or open as a local file for offline-only mode.</div>
   <label>Users</label>
   <div id="settings-user-list"></div>
   <div id="add-user-settings">
@@ -613,7 +613,13 @@ function save() {
 }
 
 // ── Sync Layer ───────────────────────────────────────────────
-function getApiUrl() { return (DATA?.settings?.apiUrl || '').replace(/\/+$/, ''); }
+function getApiUrl() {
+  const explicit = (DATA?.settings?.apiUrl || '').replace(/\/+$/, '');
+  if (explicit) return explicit;
+  // Auto-detect: if served over HTTP(S), assume the sync server is the same origin
+  if (location.protocol === 'http:' || location.protocol === 'https:') return location.origin;
+  return '';
+}
 
 function setSyncStatus(state, label) {
   const el = $('#sync-status');
@@ -1534,6 +1540,9 @@ $('#btn-settings').addEventListener('click', () => {
   $('#settings-history-days').value = DATA.settings.historyDays;
   $('#settings-theme').value = DATA.settings.theme || 'dark';
   $('#settings-api-url').value = DATA.settings.apiUrl || '';
+  // Show auto-detected URL as placeholder when no explicit URL is set
+  const autoUrl = (!DATA.settings.apiUrl && (location.protocol === 'http:' || location.protocol === 'https:')) ? location.origin + ' (auto-detected)' : 'e.g. http://192.168.1.50:8780';
+  $('#settings-api-url').placeholder = autoUrl;
   renderSettingsUsers();
   $('#settings-dialog').showModal();
 });
