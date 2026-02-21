@@ -54,37 +54,51 @@ python3 -m http.server 8765
 
 ### Multi-Device Sync (optional)
 
-To share chore data across multiple tablets/phones on the same network:
+The sync server handles data synchronisation **and** serves the app itself, so clients only need a URL — no local files required.
 
 ```bash
-# One-time setup
-pip install websockets
+# One-time setup (pick one)
+pip install websockets        # via pip
+apt install python3-websockets # via apt (Debian/Raspberry Pi OS)
 
-# Start the sync server
+# Start the sync server (defaults: port 8780, WS on 8781)
 python3 server/server.py
+# → Static:    http://0.0.0.0:8780/
 # → REST:      http://0.0.0.0:8780/data
 # → WebSocket: ws://0.0.0.0:8781
 ```
 
-Then on each device, open ⚙ Settings and enter the server URL (e.g. `http://192.168.1.50:8780`). A green dot in the top bar confirms a live connection. Data syncs instantly via WebSocket; if the connection drops, the app continues working offline from localStorage and re-syncs when the server is reachable again.
+On each device, just visit `http://<server-ip>:8780` (or open ⚙ Settings and enter the server URL to enable sync from a locally-opened file). A green dot in the top bar confirms a live connection. Data syncs instantly via WebSocket; if the connection drops, the app continues working offline from localStorage and re-syncs when the server is reachable again.
 
 **Server options:**
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--port` | `8780` | Port for REST API (WebSocket listens on port+1) |
+| `--port` | `8780` | Port for REST API & static files (WebSocket listens on port+1) |
 | `--data` | `chore-data.json` | Path to the JSON data file |
+| `--static` | *(auto-detected)* | Directory to serve static files from; set to `''` to disable |
+
+**Examples:**
+
+```bash
+python3 server/server.py --port 80              # serve on port 80 (requires root), WS on 81
+python3 server/server.py --data /tmp/data.json   # custom data file location
+python3 server/server.py --static ''             # sync-only, no static file serving
+```
 
 **Architecture:**
-- `GET /data` — fetch the full data blob (REST, port 8780)
-- `PUT /data` — save the full data blob; server stamps a `_version` field (REST, port 8780)
-- `ws://:8781` — server broadcasts `data-changed` to all connected clients on every PUT
+- `GET /` — serves `index.html` and all static assets (HTML, JS, fonts, icons, manifest)
+- `GET /data` — fetch the full data blob (REST)
+- `PUT /data` — save the full data blob; server stamps a `_version` field (REST)
+- `ws://<host>:<port+1>` — server broadcasts `data-changed` to all connected clients on every PUT
 - Clients write to localStorage immediately (instant UI), then push to the server in the background
-- Each device’s selected user and theme are kept local (not synced)
+- Each device's selected user and theme are kept local (not synced)
+
+A systemd service file is included at `server/chore-tracker.service` for auto-starting on boot (e.g. on a Raspberry Pi).
 
 For kiosk mode:
 
-- **Chromium**: `chromium --kiosk --app=http://localhost:8765`
+- **Chromium**: `chromium --kiosk --app=http://<server-ip>`
 - **Firefox**: press `F11` for fullscreen
 
 ## Usage
@@ -109,7 +123,8 @@ sw.js            — service worker for offline caching
 fonts/           — self-hosted Poppins woff2 (400, 600, 700)
 icons/           — PWA & favicon icons (16, 32, 192, 512, maskable-512)
 server/          — optional sync server for multi-device use
-  server.py      — REST + WebSocket server (Python 3, one dependency)
+  server.py      — REST + WebSocket + static file server (Python 3, one dependency)
+  chore-tracker.service — systemd unit file for auto-start on boot
 LICENSE          — MIT license
 README.md        — this file
 ```
