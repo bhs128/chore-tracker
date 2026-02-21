@@ -592,6 +592,7 @@ function defaultData() {
 
 let DATA;
 let _syncPending = false;
+let _syncDirty = false;
 let _ws = null;
 
 function migrateData() {
@@ -662,8 +663,9 @@ async function syncPull() {
 function syncPush() {
   const url = getApiUrl();
   if (!url) return;
-  if (_syncPending) return;  // debounce
+  if (_syncPending) { _syncDirty = true; return; }  // mark dirty so we re-push after current flight
   _syncPending = true;
+  _syncDirty = false;
   setSyncStatus('syncing', 'Saving…');
   // Strip local-only fields before sending
   const payload = JSON.parse(JSON.stringify(DATA));
@@ -675,9 +677,16 @@ function syncPush() {
   }).then(res => {
     _syncPending = false;
     if (res.ok) {
-      setSyncStatus('connected', 'Synced');
+      return res.json().then(data => {
+        // Update local version so we ignore our own WS broadcast
+        if (data && data.version) DATA._version = data.version;
+        setSyncStatus('connected', 'Synced');
+        // If changes accumulated during this push, push again
+        if (_syncDirty) syncPush();
+      });
     } else {
       setSyncStatus('disconnected', 'Sync error');
+      if (_syncDirty) syncPush();
     }
   }).catch(() => {
     _syncPending = false;
