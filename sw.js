@@ -1,5 +1,5 @@
 // Chore Tracker Service Worker — cache-first for offline support
-const CACHE_NAME = 'chore-tracker-v4';
+const CACHE_NAME = 'chore-tracker-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -31,9 +31,26 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// Fetch: cache-first, fall back to network
+// Fetch: network-first for HTML (so updates are picked up), cache-first for other assets
 self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request).then(cached => cached || fetch(event.request))
-  );
+  const url = new URL(event.request.url);
+  const isNav = event.request.mode === 'navigate';
+  const isHTML = url.pathname.endsWith('.html') || url.pathname === '/' || url.pathname === '';
+  if (isNav || isHTML) {
+    // Network-first for HTML — always get the latest, fall back to cache offline
+    event.respondWith(
+      fetch(event.request)
+        .then(res => {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          return res;
+        })
+        .catch(() => caches.match(event.request))
+    );
+  } else {
+    // Cache-first for fonts, icons, manifest etc.
+    event.respondWith(
+      caches.match(event.request).then(cached => cached || fetch(event.request))
+    );
+  }
 });

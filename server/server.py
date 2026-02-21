@@ -35,6 +35,7 @@ import asyncio
 import json
 import mimetypes
 import os
+import subprocess
 import time
 from http import HTTPStatus
 from pathlib import Path
@@ -55,6 +56,22 @@ except ImportError:
 # ── Defaults ──────────────────────────────────────────────────
 DEFAULT_PORT = 8780
 DEFAULT_DATA_FILE = "chore-data.json"
+
+
+def _get_git_version() -> str:
+    """Return short git hash, or '' if not in a repo."""
+    try:
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=root, capture_output=True, text=True, timeout=5
+        )
+        return result.stdout.strip() if result.returncode == 0 else ""
+    except Exception:
+        return ""
+
+
+_git_version = _get_git_version()
 
 # ── State ─────────────────────────────────────────────────────
 CLIENTS: set = set()
@@ -170,6 +187,13 @@ class RESTProtocol(asyncio.Protocol):
         if method == "OPTIONS":
             self._respond(204, "", extra_headers=CORS_HEADERS)
             return
+
+        if path == "/version":
+            if method == "GET":
+                ver = _git_version or "unknown"
+                body_str = json.dumps({"version": ver})
+                self._respond(200, body_str, content_type="application/json", extra_headers=CORS_HEADERS)
+                return
 
         if path == "/data":
             if method == "GET":
