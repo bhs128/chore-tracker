@@ -522,6 +522,10 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
     <button id="settings-close">Close</button>
     <button id="settings-save" class="primary">Save</button>
   </div>
+  <div id="settings-version" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;font-size:.62rem;color:var(--desc-text);margin-top:6px;font-family:monospace">
+    <span id="settings-version-text"></span>
+    <button id="settings-check-update" style="font-size:.62rem;padding:2px 8px;cursor:pointer">Check for updates</button>
+  </div>
 </dialog>
 
 <script>
@@ -1553,8 +1557,37 @@ $('#btn-settings').addEventListener('click', () => {
   const autoUrl = (!DATA.settings.apiUrl && (location.protocol === 'http:' || location.protocol === 'https:')) ? location.origin + ' (auto-detected)' : 'e.g. http://192.168.1.50:8780';
   $('#settings-api-url').placeholder = autoUrl;
   renderSettingsUsers();
+  // Show version
+  updateVersionDisplay();
   $('#settings-dialog').showModal();
 });
+$('#settings-check-update').addEventListener('click', async () => {
+  const btn = $('#settings-check-update');
+  btn.disabled = true;
+  btn.textContent = 'Checking…';
+  try {
+    // Force the SW to check for a new version
+    const reg = await navigator.serviceWorker?.getRegistration();
+    if (reg) await reg.update();
+    // Reload to pick up new SW / HTML
+    location.reload();
+  } catch {
+    btn.textContent = 'Reload failed';
+    setTimeout(() => { btn.disabled = false; btn.textContent = 'Check for updates'; }, 2000);
+  }
+});
+function updateVersionDisplay() {
+  const verEl = $('#settings-version-text');
+  const apiUrl = getApiUrl();
+  if (apiUrl) {
+    verEl.textContent = 'loading…';
+    fetch(apiUrl + '/version').then(r => r.json()).then(d => {
+      verEl.textContent = 'server: ' + (d.version || '?') + ' · sw: ' + (navigator.serviceWorker?.controller ? 'active' : 'none');
+    }).catch(() => { verEl.textContent = 'version: unavailable'; });
+  } else {
+    verEl.textContent = 'local-only · sw: ' + (navigator.serviceWorker?.controller ? 'active' : 'none');
+  }
+}
 $('#settings-close').addEventListener('click', () => $('#settings-dialog').close());
 $('#settings-save').addEventListener('click', async () => {
   DATA.settings.daysShown = Math.max(5, parseInt($('#settings-days-shown').value) || 14);
