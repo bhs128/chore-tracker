@@ -261,8 +261,8 @@ td.cell-future  { background: var(--future-bg); color: var(--future-text); }
 dialog {
   background: var(--dialog-bg); color: var(--text); border: 1px solid var(--bar-border);
   border-radius: 10px; padding: 20px 24px; max-width: 420px; width: 90%;
-  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  margin: 0;
+  position: fixed; top: 5vh; left: 50%; transform: translateX(-50%);
+  margin: 0; max-height: 60vh; overflow-y: auto;
 }
 dialog::backdrop { background: rgba(0,0,0,.6); }
 dialog h3 { margin-bottom: 12px; color: var(--accent); }
@@ -320,8 +320,8 @@ dialog .dialog-actions { display: flex; gap: 8px; margin-top: 16px; justify-cont
 
 /* ── Back Bar ──────────────────────────────────────────────── */
 #back-bar {
-  display: none; align-items: center; gap: 8px;
-  padding: 4px 14px;
+  display: none; align-items: center; gap: 12px;
+  padding: 10px 14px;
   background: var(--bar-bg);
   border-bottom: 1px solid var(--bar-border);
   font-size: .8rem;
@@ -329,10 +329,11 @@ dialog .dialog-actions { display: flex; gap: 8px; margin-top: 16px; justify-cont
 #back-bar.visible { display: flex; }
 #back-bar button {
   background: var(--btn-bg); color: var(--text); border: 1px solid var(--btn-border);
-  padding: 4px 10px; border-radius: 6px; font-size: .75rem; cursor: pointer;
+  padding: 8px 16px; border-radius: 6px; font-size: .9rem; cursor: pointer;
+  min-height: 44px;
 }
-#back-bar .breadcrumb { color: var(--head-text); font-size: .78rem; }
-#back-bar .breadcrumb strong { color: var(--text); }
+#back-bar .breadcrumb { color: var(--head-text); font-size: 1rem; }
+#back-bar .breadcrumb strong { color: var(--text); font-size: 1.1rem; }
 
 /* ── Task Management in Room Dialog ────────────────────────── */
 #task-section { margin-top: 8px; }
@@ -437,6 +438,8 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
   <div id="back-bar">
     <button id="btn-back">← Back</button>
     <span class="breadcrumb" id="breadcrumb"></span>
+    <span style="flex:1"></span>
+    <button id="btn-drilldown-edit" style="display:none">✏ Edit</button>
   </div>
 
   <!-- Main Table -->
@@ -853,12 +856,14 @@ function roomAggCellInfo(room, date) {
   if (!roomHasTasks(room)) return cellInfo(room, date);
   const total = room.tasks.length;
   let cleanCount = 0, worstRatio = 0, anyFuture = date > today();
+  const ratios = [];
   for (const task of room.tasks) {
     const info = taskCellInfo(room, task, date);
+    ratios.push(info.ratio);
     if (info.ratio < 1 || info.state === 'cleaned') cleanCount++;
     worstRatio = Math.max(worstRatio, info.ratio);
   }
-  return { state: cleanCount === total ? 'clean' : 'overdue', cleaned: cleanCount, total, ratio: worstRatio, fraction: `${cleanCount}/${total}`, isAggregate: true, future: anyFuture };
+  return { state: cleanCount === total ? 'clean' : 'overdue', cleaned: cleanCount, total, ratio: worstRatio, ratios, fraction: `${cleanCount}/${total}`, isAggregate: true, future: anyFuture };
 }
 
 // Task type aggregate cell info (across rooms)
@@ -866,12 +871,14 @@ function taskTypeAggCellInfo(taskLabel, date) {
   const roomTasks = getRoomsForTaskType(taskLabel);
   const total = roomTasks.length;
   let cleanCount = 0, worstRatio = 0, anyFuture = date > today();
+  const ratios = [];
   for (const { room, task } of roomTasks) {
     const info = taskCellInfo(room, task, date);
+    ratios.push(info.ratio);
     if (info.ratio < 1 || info.state === 'cleaned') cleanCount++;
     worstRatio = Math.max(worstRatio, info.ratio);
   }
-  return { state: cleanCount === total ? 'clean' : 'overdue', cleaned: cleanCount, total, ratio: worstRatio, fraction: `${cleanCount}/${total}`, isAggregate: true, future: anyFuture };
+  return { state: cleanCount === total ? 'clean' : 'overdue', cleaned: cleanCount, total, ratio: worstRatio, ratios, fraction: `${cleanCount}/${total}`, isAggregate: true, future: anyFuture };
 }
 
 // Effective cell info (aggregate or simple)
@@ -935,6 +942,26 @@ function cellTextColor(ratio) {
   const light = document.documentElement.getAttribute('data-theme') === 'light';
   if (light) return ratio < 0.6 ? '#1a3a1a' : ratio < 1.2 ? '#444' : '#5a1010';
   return ratio < 0.6 ? '#fff' : ratio < 1.2 ? '#ccc' : '#ffcccc';
+}
+
+function aggCellBg(info) {
+  if (!info.isAggregate || !info.ratios || info.ratios.length <= 1)
+    return cellColor(info.ratio, info.future);
+  // Sort ratios so best (greenest) are on the left, worst on the right
+  const sorted = [...info.ratios].sort((a, b) => a - b);
+  // If all identical, just use a flat color
+  if (sorted[0] === sorted[sorted.length - 1])
+    return cellColor(sorted[0], info.future);
+  // Build gradient with one stripe per subtask, matching drill-down colors
+  const n = sorted.length;
+  const stops = [];
+  for (let i = 0; i < n; i++) {
+    const color = cellColor(sorted[i], info.future);
+    const start = Math.round((i / n) * 100);
+    const end = Math.round(((i + 1) / n) * 100);
+    stops.push(`${color} ${start}%, ${color} ${end}%`);
+  }
+  return `linear-gradient(to right, ${stops.join(', ')})`;
 }
 
 // ── Sort ─────────────────────────────────────────────────────
@@ -1037,13 +1064,17 @@ function renderTableHead(dates, t) {
 function updateBackBar() {
   const bar = $('#back-bar');
   const bc = $('#breadcrumb');
-  if (!drillDown) { bar.classList.remove('visible'); return; }
+  const editBtn = $('#btn-drilldown-edit');
+  if (!drillDown) { bar.classList.remove('visible'); editBtn.style.display = 'none'; return; }
   bar.classList.add('visible');
   if (drillDown.type === 'room') {
     const room = DATA.rooms.find(r => r.id === drillDown.roomId);
-    bc.innerHTML = `<strong>${esc(room?.name || '?')}</strong> — tasks`;
+    bc.innerHTML = `<strong class="breadcrumb-name" data-edit-room="${esc(drillDown.roomId)}" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">${esc(room?.name || '?')}</strong> — tasks`;
+    editBtn.style.display = '';
+    editBtn.onclick = () => openRoomDialog(drillDown.roomId);
   } else {
     bc.innerHTML = `<strong>${esc(drillDown.taskLabel)}</strong> — rooms`;
+    editBtn.style.display = 'none';
   }
 }
 
@@ -1068,7 +1099,7 @@ function renderRoomView(dates, t, prefixes, animate) {
     for (const d of dates) {
       if (roomHasTasks(room)) {
         const info = roomAggCellInfo(room, d);
-        const bg = cellColor(info.ratio, info.future);
+        const bg = aggCellBg(info);
         const fg = cellTextColor(info.ratio);
         const todayCls = d === t ? ' col-today' : '';
         html += `<td class="cell-aggregate${todayCls}" style="background:${bg};color:${fg}" data-room="${room.id}" data-date="${d}" data-aggregate="room">${info.fraction}</td>`;
@@ -1139,7 +1170,7 @@ function renderTaskTypeView(dates, t, prefixes) {
     </th>`;
     for (const d of dates) {
       const info = taskTypeAggCellInfo(tt.label, d);
-      const bg = cellColor(info.ratio, info.future);
+      const bg = aggCellBg(info);
       const fg = cellTextColor(info.ratio);
       const todayCls = d === t ? ' col-today' : '';
       html += `<td class="cell-aggregate${todayCls}" style="background:${bg};color:${fg}" data-tasktype="${esc(tt.label)}" data-date="${d}" data-aggregate="tasktype">${info.fraction}</td>`;
@@ -1197,7 +1228,7 @@ function renderDrillDown(dates, t, prefixes) {
       : sortedTasksInRoom(room);
     for (const task of orderedTasks) {
       html += `<tr data-room-id="${room.id}" data-task-id="${task.id}">
-        <th colspan=3>
+        <th colspan=3 data-tasktype="${esc(task.label)}">
           <span class="room-name" style="padding-left:16px">› ${esc(task.label)}</span>
           <span class="room-cycle">every ${task.cleanDays}d</span>
         </th>`;
@@ -1307,14 +1338,14 @@ $('#table-body').addEventListener('click', e => {
   const tdAgg = e.target.closest('td[data-aggregate]');
   if (tdAgg) {
     if (tdAgg.dataset.aggregate === 'room') {
-      drillDown = { type: 'room', roomId: tdAgg.dataset.room };
+      drillDownOrder = null; drillDown = { type: 'room', roomId: tdAgg.dataset.room };
     } else if (tdAgg.dataset.aggregate === 'tasktype') {
       const roomTasks = getRoomsForTaskType(tdAgg.dataset.tasktype);
       if (roomTasks.length === 1 && tdAgg.dataset.date) {
         toggleTaskCell(roomTasks[0].room.id, roomTasks[0].task.id, tdAgg.dataset.date);
         return;
       }
-      drillDown = { type: 'tasktype', taskLabel: tdAgg.dataset.tasktype };
+      drillDownOrder = null; drillDown = { type: 'tasktype', taskLabel: tdAgg.dataset.tasktype };
     }
     renderTable();
     return;
@@ -1332,7 +1363,7 @@ $('#table-body').addEventListener('click', e => {
   if (th) {
     const room = DATA.rooms.find(r => r.id === th.dataset.roomId);
     if (room && roomHasTasks(room)) {
-      drillDown = { type: 'room', roomId: room.id };
+      drillDownOrder = null; drillDown = { type: 'room', roomId: room.id };
       renderTable();
     }
     return;
@@ -1341,7 +1372,7 @@ $('#table-body').addEventListener('click', e => {
   // Task type header: drill down
   const thTT = e.target.closest('th[data-tasktype]');
   if (thTT) {
-    drillDown = { type: 'tasktype', taskLabel: thTT.dataset.tasktype };
+    drillDownOrder = null; drillDown = { type: 'tasktype', taskLabel: thTT.dataset.tasktype };
     renderTable();
     return;
   }
@@ -1392,6 +1423,10 @@ $('#btn-view-task').addEventListener('click', () => {
   updateViewToggle(); renderTable();
 });
 $('#btn-back').addEventListener('click', () => { drillDown = null; drillDownOrder = null; renderTable(); });
+$('#breadcrumb').addEventListener('click', e => {
+  const el = e.target.closest('[data-edit-room]');
+  if (el) openRoomDialog(el.dataset.editRoom);
+});
 
 function updateViewToggle() {
   $('#btn-view-room').classList.toggle('active', viewMode === 'room');
@@ -1401,6 +1436,7 @@ function updateViewToggle() {
 // ── Room Dialog ──────────────────────────────────────────────
 let editingRoomId = null;
 let dialogTasks = [];
+let _roomDialogFromManager = false;
 
 function openRoomDialog(roomId) {
   editingRoomId = roomId || null;
@@ -1505,10 +1541,10 @@ $('#new-task-label').addEventListener('input', () => {
 
 $('#btn-add-room').addEventListener('click', () => openRoomManager());
 $('#rm-close').addEventListener('click', () => $('#room-manager-dialog').close());
-$('#rm-add-room').addEventListener('click', () => { $('#room-manager-dialog').close(); openRoomDialog(null); });
+$('#rm-add-room').addEventListener('click', () => { $('#room-manager-dialog').close(); _roomDialogFromManager = true; openRoomDialog(null); });
 $('#room-manager-list').addEventListener('click', e => {
   const item = e.target.closest('.rm-item');
-  if (item) { $('#room-manager-dialog').close(); openRoomDialog(item.dataset.roomId); }
+  if (item) { $('#room-manager-dialog').close(); _roomDialogFromManager = true; openRoomDialog(item.dataset.roomId); }
 });
 function openRoomManager() {
   const list = $('#room-manager-list');
@@ -1521,7 +1557,7 @@ function openRoomManager() {
   }).join('') || '<div style="text-align:center;color:var(--desc-text);padding:12px">No rooms yet</div>';
   $('#room-manager-dialog').showModal();
 }
-$('#room-cancel').addEventListener('click', () => { $('#room-dialog').close(); openRoomManager(); });
+$('#room-cancel').addEventListener('click', () => { $('#room-dialog').close(); if (_roomDialogFromManager) openRoomManager(); _roomDialogFromManager = false; });
 $('#room-save').addEventListener('click', () => {
   const name = $('#room-name').value.trim();
   if (!name) return;
@@ -1536,7 +1572,8 @@ $('#room-save').addEventListener('click', () => {
   }
   save(); renderTable(); renderHistory();
   $('#room-dialog').close();
-  openRoomManager();
+  if (_roomDialogFromManager) openRoomManager();
+  _roomDialogFromManager = false;
 });
 $('#room-delete').addEventListener('click', () => {
   if (editingRoomId && confirm('Delete this room?')) {
@@ -1545,7 +1582,8 @@ $('#room-delete').addEventListener('click', () => {
     if (drillDown?.type === 'room' && drillDown.roomId === editingRoomId) { drillDown = null; drillDownOrder = null; }
     save(); renderTable(); renderHistory();
     $('#room-dialog').close();
-    openRoomManager();
+    if (_roomDialogFromManager) openRoomManager();
+    _roomDialogFromManager = false;
   }
 });
 
