@@ -67,10 +67,6 @@
   --future-bg:   #1e1e3a;
   --future-text: #555;
   --spark-sun:   rgba(255,255,255,0.12);
-  --spark-fill0: rgba(27,139,74,0.45);
-  --spark-fill1: rgba(27,139,74,0.05);
-  --spark-line:  #2ecc71;
-  --spark-red:   rgba(231,76,60,0.6);
   --neutral-r:   58;
   --neutral-g:   68;
   --neutral-b:   80;
@@ -102,10 +98,6 @@
   --future-bg:   #eaecf0;
   --future-text: #aaa;
   --spark-sun:   rgba(0,0,0,0.08);
-  --spark-fill0: rgba(27,139,74,0.30);
-  --spark-fill1: rgba(27,139,74,0.03);
-  --spark-line:  #1b8b4a;
-  --spark-red:   rgba(200,50,40,0.5);
   --neutral-r:   200;
   --neutral-g:   200;
   --neutral-b:   210;
@@ -130,19 +122,19 @@ html, body {
 }
 #top-bar {
   display: flex; align-items: center; gap: 12px;
-  padding: 5px 14px;
+  padding: 8px 14px;
   background: var(--bar-bg);
   border-bottom: 1px solid var(--bar-border);
-  min-height: 44px;
+  min-height: 48px;
   flex-wrap: nowrap;
   overflow: hidden;
 }
-#top-bar h1 { font-size: 1.25rem; font-weight: 700; color: var(--accent); letter-spacing: .5px; white-space: nowrap; }
+#top-bar h1 { font-size: 1.4rem; font-weight: 700; color: var(--accent); letter-spacing: .5px; white-space: nowrap; }
 #top-bar .actions { display: flex; gap: 6px; flex-shrink: 0; }
 #top-bar button, dialog button {
   background: var(--btn-bg); color: var(--text); border: 1px solid var(--btn-border);
-  padding: 5px 10px; border-radius: 6px; font-size: .78rem; cursor: pointer;
-  transition: background .15s; white-space: nowrap;
+  padding: 8px 12px; border-radius: 6px; font-size: .78rem; cursor: pointer;
+  transition: background .15s; white-space: nowrap; min-height: 38px;
 }
 #top-bar button:hover, dialog button:hover { background: var(--btn-hover); }
 
@@ -182,6 +174,7 @@ button.primary:hover { opacity: .85; }
   position: sticky; top: 0; z-index: 2;
 }
 #chore-table thead th.today { color: var(--today-text); background: var(--today-bg); font-weight: 700; }
+.date-br { display: block; font-size: 0; height: 0; }
 #chore-table .col-today { box-shadow: inset 0 0 0 2px rgba(52,152,219,0.45); }
 #chore-table tbody th {
   background: var(--head-bg); text-align: left; padding-left: 10px;
@@ -200,6 +193,7 @@ button.primary:hover { opacity: .85; }
   font-weight: 600; font-size: .75rem;
 }
 #chore-table td:active { transform: scale(.92); }
+#chore-table tbody td:not([data-action]):active { transform: none; }
 td.cell-future  { background: var(--future-bg); color: var(--future-text); }
 
 /* ── Footer summary row ────────────────────────────────────── */
@@ -214,6 +208,8 @@ td.cell-future  { background: var(--future-bg); color: var(--future-text); }
   font-size: .7rem; font-weight: 600; color: var(--head-text);
   position: sticky; left: 0; bottom: 0; z-index: 3;
 }
+/* Progress row (done/due) — colors set inline from palette */
+.foot-net-zero { opacity: .5; }
 
 /* ── Row sort animation ────────────────────────────────────── */
 #chore-table tbody tr {
@@ -225,10 +221,10 @@ td.cell-future  { background: var(--future-bg); color: var(--future-text); }
   display: flex; gap: 4px; align-items: center;
 }
 .user-chip {
-  padding: 4px 10px; border-radius: 14px;
-  background: var(--chip-bg); font-size: .75rem; cursor: pointer;
+  padding: 6px 12px; border-radius: 14px;
+  background: var(--chip-bg); font-size: .78rem; cursor: pointer;
   border: 2px solid transparent; transition: all .15s;
-  white-space: nowrap;
+  white-space: nowrap; min-height: 34px; display: inline-flex; align-items: center;
 }
 .user-chip.selected { border-color: var(--accent); background: var(--chip-sel-bg); color: var(--text); }
 /* user management in settings */
@@ -304,6 +300,42 @@ dialog .dialog-actions { display: flex; gap: 8px; margin-top: 16px; justify-cont
   #top-bar { flex-wrap: wrap; gap: 6px; }
 }
 
+/* ── Phone layout ──────────────────────────────────────────── */
+@media (max-width: 480px) {
+  #top-bar {
+    flex-wrap: wrap; gap: 4px 8px; padding: 6px 8px; min-height: 44px;
+  }
+  #top-bar h1 { font-size: .95rem; }
+  #top-bar h1 img { width: 16px; height: 16px; }
+  #top-bar button { padding: 6px 8px; font-size: .7rem; min-height: 34px; }
+  #top-bar .tb-sep { display: none; }
+  #history-section { display: none; }
+  #sync-status #sync-label { display: none; }
+  #sync-status { flex-shrink: 0; margin-left: auto; }
+  .view-toggle button { font-size: .65rem; padding: 5px 8px; min-height: 34px; }
+  #user-section .user-chip { font-size: .68rem; padding: 2px 6px; }
+
+  #chore-table tbody th {
+    min-width: 110px; max-width: 150px; padding-left: 6px;
+  }
+  #chore-table tbody th .room-name { font-size: .72rem; }
+  #chore-table tbody th .room-desc { display: none; }
+  #chore-table tbody th .room-cycle { font-size: .58rem; }
+  #chore-table th, #chore-table td {
+    font-size: .65rem; padding: 3px 2px; min-width: 32px; height: 36px;
+  }
+  #chore-table tbody td[data-action="drill"]::after  { font-size: .7rem; }
+  #chore-table tbody td[data-action="toggle"]::after { font-size: .85rem; }
+  #chore-table tbody td[data-action="undo"]::after   { font-size: .7rem; }
+  td.cell-aggregate { font-size: .58rem; }
+
+  #back-bar { padding: 6px 8px; gap: 8px; }
+  #back-bar button { font-size: .7rem; padding: 4px 8px; min-height: 36px; }
+  #back-bar .breadcrumb { font-size: .75rem; }
+
+  dialog { padding: 14px 12px; }
+}
+
 /* ── View Toggle ───────────────────────────────────────────── */
 .view-toggle {
   display: flex; gap: 0; flex-shrink: 0;
@@ -366,6 +398,13 @@ dialog .dialog-actions { display: flex; gap: 8px; margin-top: 16px; justify-cont
 
 /* ── Aggregate cell styling ────────────────────────────────── */
 td.cell-aggregate { font-size: .65rem; font-weight: 700; }
+/* Cell action hint icons */
+#chore-table tbody td[data-action]  { position: relative; }
+#chore-table tbody td[data-action="drill"]::after  { content: '\1F50D'; position: absolute; bottom: 3px; right: 4px; font-size: 1rem; opacity: .35; pointer-events: none; line-height: 1; }
+#chore-table tbody td[data-action="toggle"]::after { content: '\2610'; position: absolute; bottom: 2px; right: 3px; font-size: 1.2rem; opacity: .3; pointer-events: none; line-height: 1; }
+#chore-table tbody td[data-action="undo"]::after   { content: '\21A9'; position: absolute; bottom: 2px; right: 3px; font-size: 1rem; opacity: .3; pointer-events: none; line-height: 1; }
+#chore-table tbody td[data-action] { cursor: pointer; }
+#chore-table tbody td:not([data-action]) { cursor: default; }
 
 /* ── Drill-down parent row ─────────────────────────────────── */
 #chore-table tbody tr.drill-parent th {
@@ -393,7 +432,7 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
 <div id="app">
   <!-- Top Bar -->
   <header id="top-bar">
-    <h1><img src="icons/icon-32.png" alt="" width="20" height="20" style="vertical-align:-2px;margin-right:6px">Chore Tracker</h1>
+    <h1><img src="icons/icon-32.png" alt="" width="24" height="24" style="vertical-align:-3px;margin-right:6px">Chore Tracker</h1>
 
     <div class="tb-sep"></div>
 
@@ -498,14 +537,29 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
 <!-- Settings dialog -->
 <dialog id="settings-dialog">
   <h3>Settings</h3>
-  <label for="settings-days-shown">Days shown in table</label>
-  <input id="settings-days-shown" type="number" min="5" max="60" value="14">
+  <label style="margin-bottom:2px">Days shown in table</label>
+  <div style="display:flex;gap:10px;align-items:center">
+    <div style="flex:1">
+      <label for="settings-past-days" style="font-size:.75rem;color:var(--desc-text)">Past</label>
+      <input id="settings-past-days" type="number" min="0" max="30" value="3">
+    </div>
+    <div style="flex:1">
+      <label for="settings-future-days" style="font-size:.75rem;color:var(--desc-text)">Future</label>
+      <input id="settings-future-days" type="number" min="1" max="60" value="10">
+    </div>
+  </div>
   <label for="settings-history-days">History chart days</label>
   <input id="settings-history-days" type="number" min="7" max="90" value="30">
   <label for="settings-theme">Color theme</label>
   <select id="settings-theme">
     <option value="dark">Dark</option>
     <option value="light">Light</option>
+  </select>
+  <label for="settings-palette">Cell color palette</label>
+  <select id="settings-palette">
+    <option value="blue-brown">Blue → Brown (default)</option>
+    <option value="green-red">Green → Red</option>
+    <option value="teal-purple">Teal → Purple</option>
   </select>
   <label for="settings-api-url">Sync server URL <span style="font-weight:400;color:var(--desc-text)">(optional)</span></label>
   <input id="settings-api-url" type="url" placeholder="e.g. http://192.168.1.50:8780" style="font-size:.78rem">
@@ -543,6 +597,7 @@ const dateStr = d => { const y = d.getFullYear(); const m = String(d.getMonth()+
 const today = () => dateStr(new Date());
 const addDays = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return dateStr(d); };
 const dayLabel = iso => { const d = new Date(iso + 'T12:00:00'); const wd = d.toLocaleDateString(undefined, { weekday: 'short' }); return `${wd} ${d.getMonth()+1}/${d.getDate()}`; };
+const dayLabelHtml = iso => { const d = new Date(iso + 'T12:00:00'); const wd = d.toLocaleDateString(undefined, { weekday: 'short' }); return `${wd}<span class="date-br"> </span>${d.getMonth()+1}/${d.getDate()}`; };
 const uid = () => crypto.randomUUID?.() || Math.random().toString(36).slice(2, 10);
 
 // ── Data Model (persisted to localStorage) ───────────────────
@@ -592,7 +647,7 @@ function defaultData() {
     ],
     users: [],
     entries: {},
-    settings: { daysShown: 14, historyDays: 30 },
+    settings: { pastDays: 3, futureDays: 10, historyDays: 30 },
     selectedUser: null,
   };
 }
@@ -605,7 +660,15 @@ let _ws = null;
 
 function migrateData() {
   if (!DATA || !DATA.rooms) DATA = defaultData();
-  if (!DATA.settings) DATA.settings = { daysShown: 14, historyDays: 30 };
+  if (!DATA.settings) DATA.settings = { pastDays: 3, futureDays: 10, historyDays: 30 };
+  // Migrate old daysShown to pastDays/futureDays
+  if (DATA.settings.daysShown && DATA.settings.pastDays == null) {
+    DATA.settings.pastDays = 3;
+    DATA.settings.futureDays = Math.max(1, DATA.settings.daysShown - 4);
+    delete DATA.settings.daysShown;
+  }
+  if (DATA.settings.pastDays == null) DATA.settings.pastDays = 3;
+  if (DATA.settings.futureDays == null) DATA.settings.futureDays = 10;
   for (const room of DATA.rooms) {
     if (!room.tasks) room.tasks = [];
   }
@@ -779,11 +842,15 @@ function getRoomsForTaskType(label) {
 
 // ── Date Range ───────────────────────────────────────────────
 function visibleDates() {
-  const n = DATA.settings.daysShown || 14;
+  let pastDays = DATA.settings.pastDays ?? 3;
+  let futureDays = DATA.settings.futureDays ?? 10;
+  // Auto-clamp for phone-sized screens
+  if (window.innerWidth <= 480) {
+    pastDays = Math.min(pastDays, 1);
+    futureDays = Math.min(futureDays, 2);
+  }
   const t = today();
   const dates = [];
-  const futureDays = Math.floor(n / 2);
-  const pastDays = n - 1 - futureDays;
   for (let i = -pastDays; i <= futureDays; i++) dates.push(addDays(t, i));
   return dates;
 }
@@ -890,6 +957,79 @@ function cellState(room, date) { return effectiveCellInfo(room, date).state; }
 function cleanedBy(room, date) { return DATA.entries[date]?.[room.id]?.user || null; }
 function taskCleanedBy(roomId, taskId, date) { return DATA.entries[date]?.[roomId]?.tasks?.[taskId]?.user || null; }
 
+// ── Footer progress stats ────────────────────────────────────
+// items: array of {room, task?}  (task present = task-level item, absent = simple room)
+function footerStats(items, date) {
+  let done = 0, newlyDue = 0;
+  for (const item of items) {
+    if (item.task) {
+      // Task-level item
+      if (DATA.entries[date]?.[item.room.id]?.tasks?.[item.task.id]?.cleaned) done++;
+      // Became due: find last cleaning BEFORE this date, check if daysSince === cleanDays
+      let daysSincePrior = 999;
+      for (let i = 1; i <= 120; i++) {
+        const prev = addDays(date, -i);
+        if (DATA.entries[prev]?.[item.room.id]?.tasks?.[item.task.id]?.cleaned) {
+          daysSincePrior = i; break;
+        }
+      }
+      if (daysSincePrior === item.task.cleanDays) newlyDue++;
+    } else {
+      // Simple room item
+      if (DATA.entries[date]?.[item.room.id]?.cleaned) done++;
+      let daysSincePrior = 999;
+      for (let i = 1; i <= 120; i++) {
+        const prev = addDays(date, -i);
+        if (DATA.entries[prev]?.[item.room.id]?.cleaned) {
+          daysSincePrior = i; break;
+        }
+      }
+      if (daysSincePrior === item.room.cleanDays) newlyDue++;
+    }
+  }
+  return { done, newlyDue };
+}
+
+// Collect all atomic items for footer stats
+function allAtomicItems() {
+  const items = [];
+  for (const room of DATA.rooms) {
+    if (roomHasTasks(room)) {
+      for (const task of room.tasks) items.push({ room, task });
+    } else {
+      items.push({ room });
+    }
+  }
+  return items;
+}
+
+// Build progress row HTML
+function progressRowHtml(items, dates, t) {
+  const p = getPalette();
+  const cleanClr = `rgb(${p.clean.join(',')})`;
+  const dirtyClr = `rgb(${p.dirty.join(',')})`;
+  let html = `<tr><th colspan=3 data-foot-tip="Daily progress:\ntasks completed\nvs tasks that became due">Progress</th>`;
+  for (const d of dates) {
+    const { done, newlyDue } = footerStats(items, d);
+    const todayCls = d === t ? ' col-today' : '';
+    const dLabel = d === t ? 'Today' : dayLabel(d);
+    if (done === 0 && newlyDue === 0) {
+      html += `<td class="${todayCls} foot-net-zero" data-foot-tip="${dLabel}\nNo tasks done or due">\u2014</td>`;
+    } else {
+      const net = done - newlyDue;
+      let parts = [];
+      if (done > 0) parts.push(`<span style="color:${cleanClr}">+${done}</span>`);
+      if (newlyDue > 0) parts.push(`<span style="color:${dirtyClr}">\u2212${newlyDue}</span>`);
+      const netWord = net > 0 ? 'cleaner' : net < 0 ? 'dirtier' : 'even';
+      const netSign = net > 0 ? '+' : '';
+      const tip = `${dLabel}\n${done} task${done !== 1 ? 's' : ''} done\n${newlyDue} new task${newlyDue !== 1 ? 's' : ''} due\nNet ${netSign}${net} (${netWord})`;
+      html += `<td class="${todayCls}" data-foot-tip="${tip}">${parts.join(' / ')}</td>`;
+    }
+  }
+  html += '</tr>';
+  return html;
+}
+
 // ── Unique user prefixes ─────────────────────────────────────
 function userPrefixes() {
   const users = DATA.users;
@@ -916,32 +1056,61 @@ function getNeutral() {
 }
 function invalidateNeutralCache() { _neutralCache = null; }
 
+const PALETTES = {
+  'green-red': {
+    clean: [46, 204, 113],   // green
+    dirty: [231, 76, 60],    // red
+    textLight: ['#1a3a1a', '#444', '#5a1010'],
+    textDark:  ['#fff', '#ccc', '#ffcccc']
+  },
+  'blue-brown': {
+    clean: [52, 152, 219],   // blue
+    dirty: [160, 82, 45],    // brown
+    textLight: ['#0d2740', '#444', '#3e1a0a'],
+    textDark:  ['#fff', '#ccc', '#f5dcc8']
+  },
+  'teal-purple': {
+    clean: [26, 188, 156],   // teal
+    dirty: [155, 89, 182],   // purple
+    textLight: ['#0a2e26', '#444', '#2d1542'],
+    textDark:  ['#fff', '#ccc', '#e8d5f0']
+  }
+};
+
+function getPalette() {
+  return PALETTES[DATA.settings.palette] || PALETTES['blue-brown'];
+}
+
 function cellColor(ratio, isFuture) {
   const opacity = isFuture ? 0.55 : 1;
   const n = getNeutral();
+  const p = getPalette();
   if (ratio <= 0) {
-    return `rgba(46,204,113,${opacity})`;
+    return `rgba(${p.clean[0]},${p.clean[1]},${p.clean[2]},${opacity})`;
   } else if (ratio < 1) {
     const t = ratio;
-    const r = Math.round(46 + (n.r - 46) * t);
-    const g = Math.round(204 + (n.g - 204) * t);
-    const b = Math.round(113 + (n.b - 113) * t);
+    const r = Math.round(p.clean[0] + (n.r - p.clean[0]) * t);
+    const g = Math.round(p.clean[1] + (n.g - p.clean[1]) * t);
+    const b = Math.round(p.clean[2] + (n.b - p.clean[2]) * t);
     return `rgba(${r},${g},${b},${opacity})`;
   } else if (ratio < 2) {
     const t = ratio - 1;
-    const r = Math.round(n.r + (231 - n.r) * t);
-    const g = Math.round(n.g + (76 - n.g) * t);
-    const b = Math.round(n.b + (60 - n.b) * t);
+    const r = Math.round(n.r + (p.dirty[0] - n.r) * t);
+    const g = Math.round(n.g + (p.dirty[1] - n.g) * t);
+    const b = Math.round(n.b + (p.dirty[2] - n.b) * t);
     return `rgba(${r},${g},${b},${opacity})`;
   } else {
-    return `rgba(231,76,60,${opacity})`;
+    return `rgba(${p.dirty[0]},${p.dirty[1]},${p.dirty[2]},${opacity})`;
   }
 }
 
 function cellTextColor(ratio) {
   const light = document.documentElement.getAttribute('data-theme') === 'light';
-  if (light) return ratio < 0.6 ? '#1a3a1a' : ratio < 1.2 ? '#444' : '#5a1010';
-  return ratio < 0.6 ? '#fff' : ratio < 1.2 ? '#ccc' : '#ffcccc';
+  const p = getPalette();
+  const txt = light ? p.textLight : p.textDark;
+  if (ratio < 0.6) return txt[0];
+  if (ratio < 1.2) return txt[1];
+  return txt[2];
 }
 
 function aggCellBg(info) {
@@ -980,17 +1149,38 @@ function daysUntilDue(room) {
   return room.cleanDays - (info.daysSince ?? 0);
 }
 
+function roomSortKey(room) {
+  const info = effectiveCellInfo(room, today());
+  // fraction done: 0 = nothing done, 1 = all done
+  const frac = info.isAggregate ? info.cleaned / info.total : (info.state === 'cleaned' || info.ratio < 1 ? 1 : 0);
+  const dud = daysUntilDue(room);
+  return { frac, dud };
+}
+
 function sortedRooms() {
   return [...DATA.rooms].sort((a, b) => {
-    const da = daysUntilDue(a), db = daysUntilDue(b);
-    if (da !== db) return da - db;
+    const ka = roomSortKey(a), kb = roomSortKey(b);
+    // Primary: fewer completed first (dirtiest)
+    if (ka.frac !== kb.frac) return ka.frac - kb.frac;
+    // Secondary: most overdue first
+    if (ka.dud !== kb.dud) return ka.dud - kb.dud;
     return (a.cleanDays || 1) - (b.cleanDays || 1);
   });
 }
 
+function taskTypeSortKey(label) {
+  const info = taskTypeAggCellInfo(label, today());
+  const frac = info.cleaned / info.total;
+  const dud = taskTypeDaysUntilDue(label);
+  return { frac, dud };
+}
+
 function sortedTaskTypes() {
   return getAllTaskTypes().sort((a, b) => {
-    return taskTypeDaysUntilDue(a.label) - taskTypeDaysUntilDue(b.label);
+    const ka = taskTypeSortKey(a.label), kb = taskTypeSortKey(b.label);
+    if (ka.frac !== kb.frac) return ka.frac - kb.frac;
+    if (ka.dud !== kb.dud) return ka.dud - kb.dud;
+    return 0;
   });
 }
 
@@ -1055,7 +1245,8 @@ function renderTableHead(dates, t) {
   headHtml += '</colgroup><tr><th colspan=3>' + (viewMode === 'tasktype' && !drillDown ? 'Task Type' : 'Room') + '</th>';
   for (const d of dates) {
     const cls = d === t ? ' class="today"' : '';
-    headHtml += `<th${cls}>${dayLabel(d)}</th>`;
+    const label = d === t ? 'Today' : dayLabelHtml(d);
+    headHtml += `<th${cls}>${label}</th>`;
   }
   headHtml += '</tr>';
   $('#table-head').innerHTML = headHtml;
@@ -1102,7 +1293,7 @@ function renderRoomView(dates, t, prefixes, animate) {
         const bg = aggCellBg(info);
         const fg = cellTextColor(info.ratio);
         const todayCls = d === t ? ' col-today' : '';
-        html += `<td class="cell-aggregate${todayCls}" style="background:${bg};color:${fg}" data-room="${room.id}" data-date="${d}" data-aggregate="room">${info.fraction}</td>`;
+        html += `<td class="cell-aggregate${todayCls}" style="background:${bg};color:${fg}" data-room="${room.id}" data-date="${d}" data-aggregate="room" data-action="drill">${info.fraction}</td>`;
       } else {
         const info = cellInfo(room, d);
         const user = cleanedBy(room, d);
@@ -1113,7 +1304,8 @@ function renderRoomView(dates, t, prefixes, animate) {
         let label = '';
         if (info.state === 'cleaned') label = user ? (prefixes[user] || user.charAt(0).toUpperCase()) : '✓';
         else if (info.daysOverdue > 0) label = `+${info.daysOverdue}`;
-        html += `<td class="${todayCls}" style="background:${bg};color:${fg}" data-room="${room.id}" data-date="${d}">${label}</td>`;
+        const action = isFuture ? '' : info.state === 'cleaned' ? ' data-action="undo"' : ' data-action="toggle"';
+        html += `<td class="${todayCls}" style="background:${bg};color:${fg}" data-room="${room.id}" data-date="${d}"${action}>${label}</td>`;
       }
     }
     html += '</tr>';
@@ -1138,7 +1330,7 @@ function renderRoomView(dates, t, prefixes, animate) {
   }
 
   // Footer
-  let footHtml = '<tr><th colspan=3>Summary</th>';
+  let footHtml = `<tr><th colspan=3 data-foot-tip="Tasks clean out of total\nacross all rooms">Summary</th>`;
   for (const d of dates) {
     let clean = 0, total = 0;
     for (const room of rooms) {
@@ -1152,9 +1344,13 @@ function renderRoomView(dates, t, prefixes, animate) {
       }
     }
     const todayCls = d === t ? ' col-today' : '';
-    footHtml += `<td class="${todayCls}">${clean}/${total}</td>`;
+    const dLabel = d === t ? 'Today' : dayLabel(d);
+    const dirty = total - clean;
+    const tip = `${dLabel}\n${clean} of ${total} tasks clean\n${dirty} task${dirty !== 1 ? 's' : ''} need attention`;
+    footHtml += `<td class="${todayCls}" data-foot-tip="${tip}">${clean}/${total}</td>`;
   }
   footHtml += '</tr>';
+  footHtml += progressRowHtml(allAtomicItems(), dates, t);
   $('#table-foot').innerHTML = footHtml;
 }
 
@@ -1173,7 +1369,18 @@ function renderTaskTypeView(dates, t, prefixes) {
       const bg = aggCellBg(info);
       const fg = cellTextColor(info.ratio);
       const todayCls = d === t ? ' col-today' : '';
-      html += `<td class="cell-aggregate${todayCls}" style="background:${bg};color:${fg}" data-tasktype="${esc(tt.label)}" data-date="${d}" data-aggregate="tasktype">${info.fraction}</td>`;
+      const roomTasks = getRoomsForTaskType(tt.label);
+      const isSingle = roomTasks.length === 1;
+      const isFuture = d > t;
+      let action;
+      if (isSingle) {
+        if (isFuture) action = '';
+        else {
+          const si = taskCellInfo(roomTasks[0].room, roomTasks[0].task, d);
+          action = si.state === 'cleaned' ? ' data-action="undo"' : ' data-action="toggle"';
+        }
+      } else { action = ' data-action="drill"'; }
+      html += `<td class="cell-aggregate${todayCls}" style="background:${bg};color:${fg}" data-tasktype="${esc(tt.label)}" data-date="${d}" data-aggregate="tasktype"${action}>${info.fraction}</td>`;
     }
     html += '</tr>';
   }
@@ -1185,7 +1392,7 @@ function renderTaskTypeView(dates, t, prefixes) {
   $('#table-body').innerHTML = html;
 
   // Footer
-  let footHtml = '<tr><th colspan=3>Summary</th>';
+  let footHtml = `<tr><th colspan=3 data-foot-tip="Tasks clean out of total\nacross all task types">Summary</th>`;
   for (const d of dates) {
     let clean = 0, total = 0;
     for (const tt of taskTypes) {
@@ -1193,9 +1400,13 @@ function renderTaskTypeView(dates, t, prefixes) {
       clean += info.cleaned; total += info.total;
     }
     const todayCls = d === t ? ' col-today' : '';
-    footHtml += `<td class="${todayCls}">${clean}/${total}</td>`;
+    const dLabel = d === t ? 'Today' : dayLabel(d);
+    const dirty = total - clean;
+    const tip = `${dLabel}\n${clean} of ${total} tasks clean\n${dirty} task${dirty !== 1 ? 's' : ''} need attention`;
+    footHtml += `<td class="${todayCls}" data-foot-tip="${tip}">${clean}/${total}</td>`;
   }
   footHtml += '</tr>';
+  footHtml += progressRowHtml(allAtomicItems(), dates, t);
   $('#table-foot').innerHTML = footHtml;
 }
 
@@ -1242,7 +1453,8 @@ function renderDrillDown(dates, t, prefixes) {
         let label = '';
         if (info.state === 'cleaned') label = user ? (prefixes[user] || user.charAt(0).toUpperCase()) : '✓';
         else if (info.daysOverdue > 0) label = `+${info.daysOverdue}`;
-        html += `<td class="${todayCls}" style="background:${bg};color:${fg}" data-room="${room.id}" data-task="${task.id}" data-date="${d}">${label}</td>`;
+        const action = isFuture ? '' : info.state === 'cleaned' ? ' data-action="undo"' : ' data-action="toggle"';
+        html += `<td class="${todayCls}" style="background:${bg};color:${fg}" data-room="${room.id}" data-task="${task.id}" data-date="${d}"${action}>${label}</td>`;
       }
       html += '</tr>';
     }
@@ -1288,7 +1500,8 @@ function renderDrillDown(dates, t, prefixes) {
         let label = '';
         if (info.state === 'cleaned') label = user ? (prefixes[user] || user.charAt(0).toUpperCase()) : '✓';
         else if (info.daysOverdue > 0) label = `+${info.daysOverdue}`;
-        html += `<td class="${todayCls}" style="background:${bg};color:${fg}" data-room="${room.id}" data-task="${task.id}" data-date="${d}">${label}</td>`;
+        const action = isFuture ? '' : info.state === 'cleaned' ? ' data-action="undo"' : ' data-action="toggle"';
+        html += `<td class="${todayCls}" style="background:${bg};color:${fg}" data-room="${room.id}" data-task="${task.id}" data-date="${d}"${action}>${label}</td>`;
       }
       html += '</tr>';
     }
@@ -1297,29 +1510,36 @@ function renderDrillDown(dates, t, prefixes) {
   $('#table-body').innerHTML = html;
 
   // Footer
-  let footHtml = '<tr><th colspan=3>Summary</th>';
+  const drillLabel = drillDown.type === 'room'
+    ? (DATA.rooms.find(r => r.id === drillDown.roomId)?.name || 'Room')
+    : (drillDown.taskLabel || 'Task');
+  let footHtml = `<tr><th colspan=3 data-foot-tip="Tasks clean out of total\nin ${esc(drillLabel)}">Summary</th>`;
+  const drillItems = [];
+  if (drillDown.type === 'room') {
+    const room = DATA.rooms.find(r => r.id === drillDown.roomId);
+    if (room && roomHasTasks(room)) {
+      for (const task of room.tasks) drillItems.push({ room, task });
+    }
+  } else {
+    for (const { room, task } of getRoomsForTaskType(drillDown.taskLabel)) {
+      drillItems.push({ room, task });
+    }
+  }
   for (const d of dates) {
     let clean = 0, total = 0;
-    if (drillDown.type === 'room') {
-      const room = DATA.rooms.find(r => r.id === drillDown.roomId);
-      if (room && roomHasTasks(room)) {
-        for (const task of room.tasks) {
-          const info = taskCellInfo(room, task, d);
-          if (info.ratio < 1 || info.state === 'cleaned') clean++;
-          total++;
-        }
-      }
-    } else {
-      for (const { room, task } of getRoomsForTaskType(drillDown.taskLabel)) {
-        const info = taskCellInfo(room, task, d);
-        if (info.ratio < 1 || info.state === 'cleaned') clean++;
-        total++;
-      }
+    for (const item of drillItems) {
+      const info = taskCellInfo(item.room, item.task, d);
+      if (info.ratio < 1 || info.state === 'cleaned') clean++;
+      total++;
     }
     const todayCls = d === t ? ' col-today' : '';
-    footHtml += `<td class="${todayCls}">${clean}/${total}</td>`;
+    const dLabel = d === t ? 'Today' : dayLabel(d);
+    const dirty = total - clean;
+    const tip = `${dLabel}\n${clean} of ${total} tasks clean\n${dirty} task${dirty !== 1 ? 's' : ''} need attention`;
+    footHtml += `<td class="${todayCls}" data-foot-tip="${tip}">${clean}/${total}</td>`;
   }
   footHtml += '</tr>';
+  footHtml += progressRowHtml(drillItems, dates, t);
   $('#table-foot').innerHTML = footHtml;
 }
 
@@ -1589,9 +1809,11 @@ $('#room-delete').addEventListener('click', () => {
 
 // ── Settings Dialog ──────────────────────────────────────────
 $('#btn-settings').addEventListener('click', () => {
-  $('#settings-days-shown').value = DATA.settings.daysShown;
+  $('#settings-past-days').value = DATA.settings.pastDays ?? 3;
+  $('#settings-future-days').value = DATA.settings.futureDays ?? 10;
   $('#settings-history-days').value = DATA.settings.historyDays;
   $('#settings-theme').value = DATA.settings.theme || 'dark';
+  $('#settings-palette').value = DATA.settings.palette || 'blue-brown';
   $('#settings-api-url').value = DATA.settings.apiUrl || '';
   // Show auto-detected URL as placeholder when no explicit URL is set
   const autoUrl = (!DATA.settings.apiUrl && (location.protocol === 'http:' || location.protocol === 'https:')) ? location.origin + ' (auto-detected)' : 'e.g. http://192.168.1.50:8780';
@@ -1630,9 +1852,11 @@ function updateVersionDisplay() {
 }
 $('#settings-close').addEventListener('click', () => $('#settings-dialog').close());
 $('#settings-save').addEventListener('click', async () => {
-  DATA.settings.daysShown = Math.max(5, parseInt($('#settings-days-shown').value) || 14);
+  DATA.settings.pastDays = Math.max(0, parseInt($('#settings-past-days').value) || 3);
+  DATA.settings.futureDays = Math.max(1, parseInt($('#settings-future-days').value) || 10);
   DATA.settings.historyDays = Math.max(7, parseInt($('#settings-history-days').value) || 30);
   DATA.settings.theme = $('#settings-theme').value;
+  DATA.settings.palette = $('#settings-palette').value;
   const newApiUrl = $('#settings-api-url').value.trim().replace(/\/+$/, '');
   const apiChanged = newApiUrl !== (DATA.settings.apiUrl || '');
   DATA.settings.apiUrl = newApiUrl || undefined;
@@ -1775,9 +1999,15 @@ function renderHistory() {
   const yFor = v => pad + (1 - v) * (H - pad * 2);
 
   const cs = getComputedStyle(document.documentElement);
+  const p = getPalette();
+  const [cr, cg, cb] = p.clean;
+  const [dr, dg, db] = p.dirty;
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const fillAlpha0 = isDark ? 0.45 : 0.30;
+  const fillAlpha1 = isDark ? 0.05 : 0.03;
   const grad = ctx.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, cs.getPropertyValue('--spark-fill0').trim());
-  grad.addColorStop(1, cs.getPropertyValue('--spark-fill1').trim());
+  grad.addColorStop(0, `rgba(${cr},${cg},${cb},${fillAlpha0})`);
+  grad.addColorStop(1, `rgba(${cr},${cg},${cb},${fillAlpha1})`);
   ctx.beginPath();
   ctx.moveTo(pad, H);
   pts.forEach((v, i) => ctx.lineTo(pad + i * stepX, yFor(v)));
@@ -1791,7 +2021,7 @@ function renderHistory() {
     const x = pad + i * stepX, y = yFor(v);
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
-  ctx.strokeStyle = cs.getPropertyValue('--spark-line').trim();
+  ctx.strokeStyle = `rgb(${cr},${cg},${cb})`;
   ctx.lineWidth = 1.5;
   ctx.lineJoin = 'round';
   ctx.stroke();
@@ -1802,14 +2032,14 @@ function renderHistory() {
     const x = pad + i * stepX, y = H - pad - v * (H - pad * 2);
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
-  ctx.strokeStyle = cs.getPropertyValue('--spark-red').trim();
+  ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
   ctx.lineWidth = 1;
   ctx.stroke();
 
   const lastX = pad + (pts.length - 1) * stepX;
   const lastY = yFor(pts[pts.length - 1]);
   ctx.beginPath(); ctx.arc(lastX, lastY, 2.5, 0, Math.PI * 2);
-  ctx.fillStyle = cs.getPropertyValue('--spark-line').trim(); ctx.fill();
+  ctx.fillStyle = `rgb(${cr},${cg},${cb})`; ctx.fill();
 
   ctx.strokeStyle = cs.getPropertyValue('--spark-sun').trim();
   ctx.lineWidth = 1;
@@ -1849,19 +2079,30 @@ $('#table-body').addEventListener('pointerover', e => {
     else if (info.daysSince > 0) stateLabel = `Clean (${info.daysSince}d ago, due in ${task.cleanDays - info.daysSince}d)`;
     else stateLabel = 'Not yet cleaned';
     if (info.future) stateLabel = 'Projected: ' + stateLabel;
-    tip = room.name + ' › ' + task.label + ' — ' + dayLabel(td.dataset.date) + '\n' + stateLabel + (user ? '\nBy: ' + user : '');
+    const actionHint = info.future ? '' : info.state === 'cleaned' ? '\nTap to unmark' : '\nTap to mark done';
+    tip = room.name + ' › ' + task.label + ' — ' + dayLabel(td.dataset.date) + '\n' + stateLabel + (user ? '\nBy: ' + user : '') + actionHint;
 
   // Aggregate room cell
   } else if (td.dataset.aggregate === 'room' && td.dataset.room && td.dataset.date) {
     const room = DATA.rooms.find(r => r.id === td.dataset.room);
     if (!room) return;
     const info = roomAggCellInfo(room, td.dataset.date);
-    tip = room.name + ' — ' + dayLabel(td.dataset.date) + '\n' + info.fraction + ' tasks clean\nTap to see details';
+    tip = room.name + ' — ' + dayLabel(td.dataset.date) + '\n' + info.fraction + ' tasks clean\nTap to see tasks';
 
   // Aggregate task type cell
   } else if (td.dataset.aggregate === 'tasktype' && td.dataset.tasktype && td.dataset.date) {
     const info = taskTypeAggCellInfo(td.dataset.tasktype, td.dataset.date);
-    tip = td.dataset.tasktype + ' — ' + dayLabel(td.dataset.date) + '\n' + info.fraction + ' rooms clean\nTap to see details';
+    const roomTasks = getRoomsForTaskType(td.dataset.tasktype);
+    const isFuture = td.dataset.date > today();
+    let actionHint;
+    if (roomTasks.length === 1) {
+      if (isFuture) actionHint = '';
+      else {
+        const si = taskCellInfo(roomTasks[0].room, roomTasks[0].task, td.dataset.date);
+        actionHint = si.state === 'cleaned' ? '\nTap to unmark' : '\nTap to mark done';
+      }
+    } else { actionHint = '\nTap to see rooms'; }
+    tip = td.dataset.tasktype + ' — ' + dayLabel(td.dataset.date) + '\n' + info.fraction + ' rooms clean' + actionHint;
 
   // Simple room cell
   } else if (td.dataset.room && td.dataset.date) {
@@ -1875,7 +2116,8 @@ $('#table-body').addEventListener('pointerover', e => {
     else if (info.daysSince > 0) stateLabel = `Clean (${info.daysSince}d ago, due in ${room.cleanDays - info.daysSince}d)`;
     else stateLabel = 'Not yet cleaned';
     if (info.future) stateLabel = 'Projected: ' + stateLabel;
-    tip = room.name + ' — ' + dayLabel(td.dataset.date) + '\n' + stateLabel + (user ? '\nBy: ' + user : '');
+    const actionHint = info.future ? '' : info.state === 'cleaned' ? '\nTap to unmark' : '\nTap to mark done';
+    tip = room.name + ' — ' + dayLabel(td.dataset.date) + '\n' + stateLabel + (user ? '\nBy: ' + user : '') + actionHint;
   }
 
   if (!tip) { $('#cell-tooltip').style.display = 'none'; return; }
@@ -1886,6 +2128,18 @@ $('#table-body').addEventListener('pointerover', e => {
   tt.style.top = (e.clientY + 12) + 'px';
 });
 $('#table-body').addEventListener('pointerleave', () => { $('#cell-tooltip').style.display = 'none'; });
+
+// Footer tooltips
+$('#table-foot').addEventListener('pointerover', e => {
+  const el = e.target.closest('[data-foot-tip]');
+  if (!el) { $('#cell-tooltip').style.display = 'none'; return; }
+  const tt = $('#cell-tooltip');
+  tt.textContent = el.dataset.footTip; tt.style.whiteSpace = 'pre-line';
+  tt.style.display = 'block';
+  tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 210) + 'px';
+  tt.style.top = (e.clientY - 60) + 'px';
+});
+$('#table-foot').addEventListener('pointerleave', () => { $('#cell-tooltip').style.display = 'none'; });
 
 // ── Garbage-collect old entries (> 120 days) ─────────────────
 function gc() {
@@ -1921,7 +2175,7 @@ setInterval(async () => {
   }
   renderTable(); renderHistory();
 }, 60_000);
-window.addEventListener('resize', () => { renderHistory(); });
+window.addEventListener('resize', () => { renderTable(); renderHistory(); });
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
