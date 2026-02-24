@@ -2059,9 +2059,10 @@ function renderHistory() {
     `${last?.clean || 0}✓ ${last?.overdue || 0}✗ · ${totalClean}/${totalClean + totalOverdue} task-days`;
 }
 
-// ── Tooltip on hover/long-press ──────────────────────────────
+// ── Tooltip on hover (desktop only) ──────────────────────────
+const hasHover = window.matchMedia('(hover: hover)').matches;
 $('#table-body').addEventListener('pointerover', e => {
-  if (e.pointerType === 'touch') return;
+  if (!hasHover) return;
   const td = e.target.closest('td');
   if (!td) { $('#cell-tooltip').style.display = 'none'; return; }
 
@@ -2132,7 +2133,7 @@ $('#table-body').addEventListener('pointerleave', () => { $('#cell-tooltip').sty
 
 // Footer tooltips
 $('#table-foot').addEventListener('pointerover', e => {
-  if (e.pointerType === 'touch') return;
+  if (!hasHover) return;
   const el = e.target.closest('[data-foot-tip]');
   if (!el) { $('#cell-tooltip').style.display = 'none'; return; }
   const tt = $('#cell-tooltip');
