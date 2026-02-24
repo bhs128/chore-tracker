@@ -2061,6 +2061,18 @@ function renderHistory() {
 
 // ── Tooltip on hover (desktop only) ──────────────────────────
 const hasHover = window.matchMedia('(hover: hover)').matches;
+let _tipTimer = null;
+function clearTip() { clearTimeout(_tipTimer); _tipTimer = null; $('#cell-tooltip').style.display = 'none'; }
+function showTipAfterDelay(text, x, y, above) {
+  clearTimeout(_tipTimer);
+  _tipTimer = setTimeout(() => {
+    const tt = $('#cell-tooltip');
+    tt.textContent = text; tt.style.whiteSpace = 'pre-line';
+    tt.style.display = 'block';
+    tt.style.left = Math.min(x + 12, window.innerWidth - 210) + 'px';
+    tt.style.top = (above ? y - 60 : y + 12) + 'px';
+  }, 700);
+}
 $('#table-body').addEventListener('pointerover', e => {
   if (!hasHover) return;
   const td = e.target.closest('td');
@@ -2122,27 +2134,19 @@ $('#table-body').addEventListener('pointerover', e => {
     tip = room.name + ' — ' + dayLabel(td.dataset.date) + '\n' + stateLabel + (user ? '\nBy: ' + user : '') + actionHint;
   }
 
-  if (!tip) { $('#cell-tooltip').style.display = 'none'; return; }
-  const tt = $('#cell-tooltip');
-  tt.textContent = tip; tt.style.whiteSpace = 'pre-line';
-  tt.style.display = 'block';
-  tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 210) + 'px';
-  tt.style.top = (e.clientY + 12) + 'px';
+  if (!tip) { clearTip(); return; }
+  showTipAfterDelay(tip, e.clientX, e.clientY, false);
 });
-$('#table-body').addEventListener('pointerleave', () => { $('#cell-tooltip').style.display = 'none'; });
+$('#table-body').addEventListener('pointerleave', () => { clearTip(); });
 
 // Footer tooltips
 $('#table-foot').addEventListener('pointerover', e => {
   if (!hasHover) return;
   const el = e.target.closest('[data-foot-tip]');
-  if (!el) { $('#cell-tooltip').style.display = 'none'; return; }
-  const tt = $('#cell-tooltip');
-  tt.textContent = el.dataset.footTip; tt.style.whiteSpace = 'pre-line';
-  tt.style.display = 'block';
-  tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 210) + 'px';
-  tt.style.top = (e.clientY - 60) + 'px';
+  if (!el) { clearTip(); return; }
+  showTipAfterDelay(el.dataset.footTip, e.clientX, e.clientY, true);
 });
-$('#table-foot').addEventListener('pointerleave', () => { $('#cell-tooltip').style.display = 'none'; });
+$('#table-foot').addEventListener('pointerleave', () => { clearTip(); });
 
 // ── Garbage-collect old entries (> 120 days) ─────────────────
 function gc() {
