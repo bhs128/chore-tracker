@@ -174,6 +174,23 @@ button.primary:hover { opacity: .85; }
   position: sticky; top: 0; z-index: 2;
 }
 #chore-table thead th.today { color: var(--today-text); background: var(--today-bg); font-weight: 700; }
+/* Date navigation arrows */
+#chore-table thead th.date-nav { cursor: pointer; position: relative; }
+#chore-table thead th.date-nav::after {
+  content: ''; position: absolute; top: 50%; transform: translateY(-50%);
+  width: 0; height: 0; opacity: .35; pointer-events: none;
+}
+#chore-table thead th.date-nav:hover::after { opacity: .7; }
+#chore-table thead th.date-nav-prev::after {
+  left: 3px;
+  border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+  border-right: 6px solid var(--head-text);
+}
+#chore-table thead th.date-nav-next::after {
+  right: 3px;
+  border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+  border-left: 6px solid var(--head-text);
+}
 .date-br { display: block; font-size: 0; height: 0; }
 #chore-table .col-today { box-shadow: inset 0 0 0 2px rgba(52,152,219,0.45); }
 #chore-table tbody th {
@@ -814,6 +831,7 @@ async function syncInit() {
 let viewMode = 'room';      // 'room' | 'tasktype'
 let drillDown = null;        // null | { type:'room', roomId } | { type:'tasktype', taskLabel }
 let drillDownOrder = null;   // cached sort order for drill-down (prevents re-sort on toggle)
+let dateOffset = 0;          // shift visible date window (negative = past, positive = future)
 
 // ── Task Helpers ─────────────────────────────────────────────
 function roomHasTasks(room) { return room.tasks && room.tasks.length > 0; }
@@ -851,7 +869,7 @@ function visibleDates() {
   }
   const t = today();
   const dates = [];
-  for (let i = -pastDays; i <= futureDays; i++) dates.push(addDays(t, i));
+  for (let i = -pastDays + dateOffset; i <= futureDays + dateOffset; i++) dates.push(addDays(t, i));
   return dates;
 }
 
@@ -960,12 +978,10 @@ function taskCleanedBy(roomId, taskId, date) { return DATA.entries[date]?.[roomI
 // ── Footer progress stats ────────────────────────────────────
 // items: array of {room, task?}  (task present = task-level item, absent = simple room)
 function footerStats(items, date) {
-  let done = 0, newlyDue = 0;
+  let maintain = 0, progress = 0, newlyDue = 0;
   for (const item of items) {
     if (item.task) {
-      // Task-level item
-      if (DATA.entries[date]?.[item.room.id]?.tasks?.[item.task.id]?.cleaned) done++;
-      // Became due: find last cleaning BEFORE this date, check if daysSince === cleanDays
+      const wasCleaned = !!DATA.entries[date]?.[item.room.id]?.tasks?.[item.task.id]?.cleaned;
       let daysSincePrior = 999;
       for (let i = 1; i <= 120; i++) {
         const prev = addDays(date, -i);
@@ -973,10 +989,13 @@ function footerStats(items, date) {
           daysSincePrior = i; break;
         }
       }
+      if (wasCleaned) {
+        if (daysSincePrior >= item.task.cleanDays) progress++;
+        else maintain++;
+      }
       if (daysSincePrior === item.task.cleanDays) newlyDue++;
     } else {
-      // Simple room item
-      if (DATA.entries[date]?.[item.room.id]?.cleaned) done++;
+      const wasCleaned = !!DATA.entries[date]?.[item.room.id]?.cleaned;
       let daysSincePrior = 999;
       for (let i = 1; i <= 120; i++) {
         const prev = addDays(date, -i);
@@ -984,10 +1003,14 @@ function footerStats(items, date) {
           daysSincePrior = i; break;
         }
       }
+      if (wasCleaned) {
+        if (daysSincePrior >= item.room.cleanDays) progress++;
+        else maintain++;
+      }
       if (daysSincePrior === item.room.cleanDays) newlyDue++;
     }
   }
-  return { done, newlyDue };
+  return { maintain, progress, newlyDue };
 }
 
 // Collect all atomic items for footer stats
@@ -1008,21 +1031,33 @@ function progressRowHtml(items, dates, t) {
   const p = getPalette();
   const cleanClr = `rgb(${p.clean.join(',')})`;
   const dirtyClr = `rgb(${p.dirty.join(',')})`;
-  let html = `<tr><th colspan=3 data-foot-tip="Daily progress:\ntasks completed\nvs tasks that became due">Progress</th>`;
+  const neutClr = 'var(--desc-text)';
+  let html = `<tr><th colspan=3 data-foot-tip="Daily effort &amp; progress:\ntasks cleaned (maintain + forward)\nvs tasks that became due">Progress</th>`;
   for (const d of dates) {
-    const { done, newlyDue } = footerStats(items, d);
+    const { maintain, progress, newlyDue } = footerStats(items, d);
+    const totalDone = maintain + progress;
     const todayCls = d === t ? ' col-today' : '';
     const dLabel = d === t ? 'Today' : dayLabel(d);
-    if (done === 0 && newlyDue === 0) {
+    if (totalDone === 0 && newlyDue === 0) {
       html += `<td class="${todayCls} foot-net-zero" data-foot-tip="${dLabel}\nNo tasks done or due">\u2014</td>`;
     } else {
-      const net = done - newlyDue;
       let parts = [];
-      if (done > 0) parts.push(`<span style="color:${cleanClr}">+${done}</span>`);
+      if (totalDone > 0) {
+        let doneLabel;
+        if (maintain > 0 && progress > 0) doneLabel = `${maintain}+${progress}`;
+        else if (progress > 0) doneLabel = `${progress}`;
+        else doneLabel = `${maintain}`;
+        parts.push(`<span style="color:${cleanClr}">+${doneLabel}</span>`);
+      }
       if (newlyDue > 0) parts.push(`<span style="color:${dirtyClr}">\u2212${newlyDue}</span>`);
+      const net = progress - newlyDue;
       const netWord = net > 0 ? 'cleaner' : net < 0 ? 'dirtier' : 'even';
       const netSign = net > 0 ? '+' : '';
-      const tip = `${dLabel}\n${done} task${done !== 1 ? 's' : ''} done\n${newlyDue} new task${newlyDue !== 1 ? 's' : ''} due\nNet ${netSign}${net} (${netWord})`;
+      const tip = `${dLabel}\n${totalDone} task${totalDone !== 1 ? 's' : ''} cleaned` +
+        (maintain > 0 ? `\n  ${maintain} maintain/proactive` : '') +
+        (progress > 0 ? `\n  ${progress} due/overdue (forward progress)` : '') +
+        `\n${newlyDue} new task${newlyDue !== 1 ? 's' : ''} due` +
+        `\nNet ${netSign}${net} (${netWord})`;
       html += `<td class="${todayCls}" data-foot-tip="${tip}">${parts.join(' / ')}</td>`;
     }
   }
@@ -1243,8 +1278,15 @@ function renderTableHead(dates, t) {
   let headHtml = '<colgroup><col><col><col>';
   for (let i = 0; i < dates.length; i++) headHtml += '<col>';
   headHtml += '</colgroup><tr><th colspan=3>' + (viewMode === 'tasktype' && !drillDown ? 'Task Type' : 'Room') + '</th>';
-  for (const d of dates) {
-    const cls = d === t ? ' class="today"' : '';
+  for (let i = 0; i < dates.length; i++) {
+    const d = dates[i];
+    const isFirst = i === 0;
+    const isLast = i === dates.length - 1;
+    const classes = [];
+    if (d === t) classes.push('today');
+    if (isFirst) classes.push('date-nav date-nav-prev');
+    if (isLast) classes.push('date-nav date-nav-next');
+    const cls = classes.length ? ` class="${classes.join(' ')}"` : '';
     const label = d === t ? 'Today' : dayLabelHtml(d);
     headHtml += `<th${cls}>${label}</th>`;
   }
@@ -1632,6 +1674,14 @@ function toggleTaskCell(roomId, taskId, date) {
 }
 
 // ── View Toggle & Back ───────────────────────────────────────
+// ── Date Navigation (arrow headers) ──────────────────────────
+$('#table-head').addEventListener('click', e => {
+  const th = e.target.closest('th.date-nav');
+  if (!th) return;
+  if (th.classList.contains('date-nav-prev')) { dateOffset--; renderTable(); }
+  else if (th.classList.contains('date-nav-next')) { dateOffset++; renderTable(); }
+});
+
 $('#btn-view-room').addEventListener('click', () => {
   if (viewMode === 'room' && !drillDown) return;
   viewMode = 'room'; drillDown = null; drillDownOrder = null;
