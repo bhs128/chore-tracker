@@ -442,6 +442,245 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
 .rm-item:hover { background: var(--btn-hover); }
 .rm-item .rm-name { flex: 1; font-size: .85rem; font-weight: 600; }
 .rm-item .rm-info { font-size: .68rem; color: var(--desc-text); flex-shrink: 0; }
+
+/* ── Review Dashboard ──────────────────────────────────────── */
+#review-dialog {
+  max-width: 1200px; width: 94vw; max-height: 92vh;
+  padding: 20px 28px; top: 2vh;
+}
+.review-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.review-header h3 { margin: 0; font-size: 1.1rem; }
+.review-close-btn {
+  background: none; border: none; color: var(--text); font-size: 1.3rem;
+  cursor: pointer; padding: 4px 10px; border-radius: 6px; line-height: 1;
+}
+.review-close-btn:hover { background: var(--btn-hover); }
+
+/* Hero stats */
+.hero-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px;
+}
+.hero-card {
+  background: var(--cell-bg); border-radius: 10px; padding: 14px 16px;
+  text-align: center; position: relative; overflow: hidden;
+}
+.hero-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+}
+.hero-emoji { font-size: 1.5rem; display: block; margin-bottom: 4px; }
+.hero-val { font-size: 1.6rem; font-weight: 800; line-height: 1.1; display: block; }
+.hero-label { font-size: .68rem; color: var(--desc-text); margin-top: 4px; display: block; }
+.hero-sub { font-size: .62rem; color: var(--desc-text); margin-top: 2px; display: block; }
+
+/* Activity heatmap grid */
+.heatmap-section {
+  margin-bottom: 16px; background: var(--cell-bg); border-radius: 10px; padding: 14px 16px;
+}
+.heatmap-label { font-size: .78rem; color: var(--desc-text); margin-bottom: 10px; font-weight: 600; }
+.heatmap-grid {
+  display: grid; gap: 3px;
+  /* columns set via inline style: grid-template-columns: <label> repeat(N, 1fr) */
+}
+.heatmap-grid-row {
+  display: contents; /* children participate in the parent grid */
+}
+.heatmap-user-label {
+  font-size: .62rem; font-weight: 600; color: var(--desc-text);
+  display: flex; align-items: center; padding-right: 6px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.heatmap-user-label.total-label { font-weight: 800; color: var(--text); }
+.heatmap-cell {
+  aspect-ratio: 1; border-radius: 3px; position: relative;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .55rem; font-weight: 700; color: rgba(255,255,255,.8);
+  min-width: 0;
+}
+.heatmap-cell.future { opacity: .3; }
+.heatmap-cell.today-cell { box-shadow: 0 0 0 2px var(--accent); }
+.heatmap-day-header {
+  font-size: .5rem; color: var(--desc-text); text-align: center;
+  display: flex; align-items: flex-end; justify-content: center;
+  padding-bottom: 2px;
+}
+.heatmap-separator {
+  grid-column: 1 / -1; height: 1px; background: var(--sep-color); margin: 2px 0;
+}
+.heatmap-span-header {
+  font-size: .5rem; color: var(--desc-text); text-align: center;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  line-height: 1; padding: 2px 2px;
+  display: flex; align-items: flex-end; justify-content: center;
+  border-radius: 3px;
+}
+.heatmap-span-header.month-hdr { font-weight: 600; }
+.heatmap-span-header.week-hdr { font-weight: 500; font-size: .45rem; }
+.heatmap-span-header.span-even { background: var(--head-bg); }
+.heatmap-span-header.span-odd { background: var(--bar-border); }
+
+/* Section cards */
+.review-section {
+  background: var(--cell-bg); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px;
+}
+.review-section:last-child { margin-bottom: 0; }
+.review-section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; user-select: none;
+}
+.review-section-header h4 { margin: 0; font-size: .92rem; color: var(--accent); }
+.review-section-header .review-toggle {
+  font-size: .7rem; color: var(--desc-text); transition: transform .2s;
+}
+.review-section.collapsed .review-section-body { display: none; }
+.review-section.collapsed .review-toggle { transform: rotate(-90deg); }
+.review-section-body { margin-top: 10px; }
+
+/* Two-column grids */
+.review-grid-2 {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+.review-grid-today {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start;
+}
+.review-grid-today > div { min-height: 0; }
+
+/* Hit list */
+.hit-list { list-style: none; margin: 0; padding: 0; }
+.hit-list li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 8px; margin-bottom: 5px;
+  font-size: .82rem;
+}
+.hit-list li:last-child { margin-bottom: 0; }
+.hit-rank {
+  width: 24px; height: 24px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center;
+  font-size: .72rem; font-weight: 700; flex-shrink: 0;
+  background: var(--accent); color: #fff;
+}
+.hit-rank.top { background: #e67e22; }
+.hit-detail { flex: 1; min-width: 0; }
+.hit-task { font-weight: 600; }
+.hit-room { font-size: .7rem; color: var(--desc-text); }
+.hit-overdue {
+  font-size: .68rem; font-weight: 600; flex-shrink: 0; padding: 2px 8px;
+  border-radius: 10px;
+}
+
+/* Done list */
+.done-group { margin-bottom: 10px; }
+.done-group:last-child { margin-bottom: 0; }
+.done-user {
+  font-weight: 700; font-size: .82rem; margin-bottom: 4px;
+  display: flex; align-items: center; gap: 6px;
+}
+.done-user .done-count { font-weight: 400; font-size: .68rem; color: var(--desc-text); }
+.done-tasks { display: flex; flex-wrap: wrap; gap: 4px; padding-left: 4px; }
+.done-tag {
+  font-size: .72rem; padding: 3px 10px; border-radius: 10px;
+  background: var(--head-bg); color: var(--head-text);
+}
+
+/* Leaderboard */
+.leaderboard { margin-bottom: 10px; }
+.lb-row {
+  display: flex; align-items: center; gap: 10px; padding: 5px 0;
+  font-size: .84rem;
+}
+.lb-medal { width: 24px; text-align: center; font-size: 1.1rem; flex-shrink: 0; }
+.lb-rank { width: 20px; font-weight: 700; text-align: center; color: var(--accent); flex-shrink: 0; }
+.lb-name { width: 80px; font-weight: 600; flex-shrink: 0; }
+.lb-bar-wrap {
+  flex: 1; height: 18px; background: var(--head-bg); border-radius: 9px; overflow: hidden;
+  position: relative; min-width: 60px;
+}
+.lb-bar { height: 100%; border-radius: 9px; transition: width .4s ease; }
+.lb-bar-label {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  font-size: .65rem; font-weight: 600; color: var(--head-text);
+}
+.lb-count { width: 36px; text-align: right; font-size: .78rem; color: var(--desc-text); flex-shrink: 0; }
+.lb-breakdown { font-size: .62rem; color: var(--desc-text); flex-shrink: 0; width: 90px; text-align: right; }
+
+/* Badges */
+.badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: .74rem; padding: 4px 12px; border-radius: 14px;
+  background: var(--head-bg); color: var(--head-text);
+  border: 1px solid var(--bar-border);
+}
+.badge .badge-icon { font-size: .9rem; }
+.badge .badge-user { font-weight: 700; }
+
+/* Week/month stats bar */
+.week-stats {
+  display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 10px;
+  font-size: .8rem;
+}
+.week-stat { display: flex; align-items: center; gap: 4px; }
+.week-stat-val { font-weight: 700; }
+
+/* All-clean celebration */
+.all-clean {
+  text-align: center; padding: 20px; font-size: .95rem; color: var(--accent);
+}
+.all-clean .all-clean-emoji { font-size: 2.4rem; display: block; margin-bottom: 8px; }
+
+/* Room health mini-cards */
+.room-health-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px;
+  margin-top: 10px;
+}
+.room-health-card {
+  border-radius: 8px; padding: 6px 8px; text-align: center;
+  font-size: .7rem; font-weight: 600;
+}
+.room-health-card .rhc-name {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.room-health-card .rhc-frac { font-size: .62rem; font-weight: 400; margin-top: 1px; }
+
+/* Sub-section labels */
+.review-sub-label {
+  font-size: .75rem; color: var(--desc-text); margin-bottom: 6px;
+  display: flex; align-items: center; gap: 6px;
+}
+.review-sub-label::after {
+  content: ''; flex: 1; height: 1px; background: var(--sep-color);
+}
+
+/* ── Review responsive: tablet ─────────────────────────────── */
+@media (max-width: 768px) {
+  .hero-stats { grid-template-columns: repeat(2, 1fr); }
+  .review-grid-2, .review-grid-today { grid-template-columns: 1fr; }
+  .lb-breakdown { display: none; }
+  .heatmap-cell { font-size: 0; } /* hide numbers, keep colored squares */
+  .heatmap-user-label { font-size: .56rem; }
+}
+
+/* ── Review responsive: phone ──────────────────────────────── */
+@media (max-width: 480px) {
+  #review-dialog { max-width: 100%; width: 97%; padding: 12px 10px; max-height: 94vh; top: 1vh; }
+  .hero-stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .hero-card { padding: 10px 8px; }
+  .hero-val { font-size: 1.3rem; }
+  .hero-emoji { font-size: 1.2rem; }
+  .review-section, .heatmap-section { padding: 10px 12px; }
+  .hit-list li { font-size: .75rem; padding: 6px 8px; }
+  .lb-row { font-size: .76rem; }
+  .lb-name { width: 60px; }
+  .lb-breakdown { display: none; }
+  .lb-medal { width: 20px; font-size: .9rem; }
+  .done-tag { font-size: .68rem; }
+  .badge { font-size: .68rem; padding: 3px 8px; }
+  .heatmap-cell { font-size: 0; }
+  .heatmap-day-header, .heatmap-span-header { font-size: 0; height: 0; padding: 0; margin: 0; overflow: hidden; }
+  .heatmap-grid { gap: 2px; }
+  .heatmap-user-label { font-size: .5rem; }
+  .room-health-grid { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); }
+  .room-health-card { font-size: .62rem; padding: 4px 6px; }
+}
 </style>
 </head>
 <body>
@@ -485,6 +724,7 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
     </div>
 
     <div class="actions">
+      <button id="btn-review">📊 Review</button>
       <button id="btn-add-room">✏ Rooms</button>
       <button id="btn-settings">⚙</button>
     </div>
@@ -510,6 +750,15 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
 
 <!-- Cell tooltip -->
 <div id="cell-tooltip"></div>
+
+<!-- Review dialog -->
+<dialog id="review-dialog">
+  <div class="review-header">
+    <h3>📊 Review</h3>
+    <button id="review-close" class="review-close-btn">✕</button>
+  </div>
+  <div id="review-content"></div>
+</dialog>
 
 <!-- Room Manager dialog -->
 <dialog id="room-manager-dialog">
@@ -1246,6 +1495,582 @@ function sortedRoomsForTask(taskLabel) {
   });
 }
 
+// ── Review Feature ───────────────────────────────────────────
+function getMonday(isoDate) {
+  const d = new Date(isoDate + 'T12:00:00');
+  const day = d.getDay(); // 0=Sun
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return dateStr(d);
+}
+
+function getFirstOfMonth(isoDate) {
+  const d = new Date(isoDate + 'T12:00:00');
+  d.setDate(1);
+  return dateStr(d);
+}
+
+function getLastOfMonth(isoDate) {
+  const d = new Date(isoDate + 'T12:00:00');
+  d.setMonth(d.getMonth() + 1);
+  d.setDate(0);
+  return dateStr(d);
+}
+
+function computeReviewData() {
+  const t = today();
+  const items = allAtomicItems();
+
+  // Week boundaries (Mon–Sun)
+  const thisMonday = getMonday(t);
+  const lastMonday = addDays(thisMonday, -7);
+  const lastSunday = addDays(thisMonday, -1);
+  const thisSunday = addDays(thisMonday, 6);
+
+  // Month boundaries
+  const thisMonthStart = getFirstOfMonth(t);
+  const thisMonthEnd = getLastOfMonth(t);
+  const prevMonthEnd = addDays(thisMonthStart, -1);
+  const lastMonthStart = getFirstOfMonth(prevMonthEnd);
+
+  // --- TODAY ---
+  const hitList = [];
+  const doneToday = []; // {task, room, user}
+  let cleanCount = 0;
+
+  for (const item of items) {
+    if (item.task) {
+      const info = taskCellInfo(item.room, item.task, t);
+      const user = DATA.entries[t]?.[item.room.id]?.tasks?.[item.task.id]?.user || null;
+      if (info.state === 'cleaned') {
+        doneToday.push({ task: item.task.label, room: item.room.name, user: user || 'Unknown' });
+        cleanCount++;
+      } else if (info.ratio < 1) {
+        cleanCount++;
+      }
+      if (info.state === 'overdue' || (info.ratio >= 1 && info.state !== 'cleaned')) {
+        hitList.push({
+          task: item.task.label, room: item.room.name,
+          daysOverdue: info.daysOverdue, cleanDays: item.task.cleanDays,
+          ratio: info.ratio
+        });
+      }
+    } else {
+      const info = cellInfo(item.room, t);
+      const user = DATA.entries[t]?.[item.room.id]?.user || null;
+      if (info.state === 'cleaned') {
+        doneToday.push({ task: item.room.name, room: '', user: user || 'Unknown' });
+        cleanCount++;
+      } else if (info.ratio < 1) {
+        cleanCount++;
+      }
+      if (info.state === 'overdue') {
+        hitList.push({
+          task: item.room.name, room: '',
+          daysOverdue: info.daysOverdue, cleanDays: item.room.cleanDays,
+          ratio: info.ratio
+        });
+      }
+    }
+  }
+
+  // Sort hit list: most overdue first, then by rarity
+  hitList.sort((a, b) => b.daysOverdue - a.daysOverdue || b.cleanDays - a.cleanDays);
+
+  // Group done by user
+  const doneByUser = {};
+  for (const d of doneToday) {
+    if (!doneByUser[d.user]) doneByUser[d.user] = [];
+    doneByUser[d.user].push(d);
+  }
+
+  // Room health snapshot
+  const roomHealth = DATA.rooms.map(room => {
+    const info = effectiveCellInfo(room, t);
+    return {
+      name: room.name,
+      ratio: info.isAggregate ? info.ratio : info.ratio,
+      fraction: info.isAggregate ? info.fraction : (info.state === 'cleaned' || info.ratio < 1 ? '1/1' : '0/1'),
+      state: info.state
+    };
+  });
+
+  // --- PERIOD helper ---
+  function computePeriod(startDate, endDate) {
+    const dates = [];
+    let d = startDate;
+    const limit = endDate < t ? endDate : t;
+    while (d <= limit) { dates.push(d); d = addDays(d, 1); }
+
+    let totalDue = 0, totalDone = 0;
+    const userDone = {};
+    const userMaintain = {};
+    const userProgress = {};
+    const dailyDone = {}; // date -> count
+    let mostOverdueTask = null;
+    let mostOverdueDays = 0;
+    let mostOverdueUser = null;
+
+    for (const date of dates) {
+      let dayCount = 0;
+      for (const item of items) {
+        if (item.task) {
+          const entry = DATA.entries[date]?.[item.room.id]?.tasks?.[item.task.id];
+          if (entry?.cleaned) {
+            totalDone++; dayCount++;
+            const user = entry.user || 'Unknown';
+            userDone[user] = (userDone[user] || 0) + 1;
+
+            let daysSincePrior = 999;
+            for (let i = 1; i <= 120; i++) {
+              const prev = addDays(date, -i);
+              if (DATA.entries[prev]?.[item.room.id]?.tasks?.[item.task.id]?.cleaned) {
+                daysSincePrior = i; break;
+              }
+            }
+            if (daysSincePrior >= item.task.cleanDays) {
+              userProgress[user] = (userProgress[user] || 0) + 1;
+              if (daysSincePrior - item.task.cleanDays > mostOverdueDays) {
+                mostOverdueDays = daysSincePrior - item.task.cleanDays;
+                mostOverdueTask = item.task.label + ' (' + item.room.name + ')';
+                mostOverdueUser = user;
+              }
+            } else {
+              userMaintain[user] = (userMaintain[user] || 0) + 1;
+            }
+          }
+          let daysSincePrior = 999;
+          for (let i = 1; i <= 120; i++) {
+            const prev = addDays(date, -i);
+            if (DATA.entries[prev]?.[item.room.id]?.tasks?.[item.task.id]?.cleaned) {
+              daysSincePrior = i; break;
+            }
+          }
+          if (daysSincePrior === item.task.cleanDays) totalDue++;
+        } else {
+          const entry = DATA.entries[date]?.[item.room.id];
+          if (entry?.cleaned) {
+            totalDone++; dayCount++;
+            const user = entry.user || 'Unknown';
+            userDone[user] = (userDone[user] || 0) + 1;
+
+            let daysSincePrior = 999;
+            for (let i = 1; i <= 120; i++) {
+              const prev = addDays(date, -i);
+              if (DATA.entries[prev]?.[item.room.id]?.cleaned) {
+                daysSincePrior = i; break;
+              }
+            }
+            if (daysSincePrior >= item.room.cleanDays) {
+              userProgress[user] = (userProgress[user] || 0) + 1;
+              if (daysSincePrior - item.room.cleanDays > mostOverdueDays) {
+                mostOverdueDays = daysSincePrior - item.room.cleanDays;
+                mostOverdueTask = item.room.name;
+                mostOverdueUser = user;
+              }
+            } else {
+              userMaintain[user] = (userMaintain[user] || 0) + 1;
+            }
+          }
+          let daysSincePrior = 999;
+          for (let i = 1; i <= 120; i++) {
+            const prev = addDays(date, -i);
+            if (DATA.entries[prev]?.[item.room.id]?.cleaned) {
+              daysSincePrior = i; break;
+            }
+          }
+          if (daysSincePrior === item.room.cleanDays) totalDue++;
+        }
+      }
+      dailyDone[date] = dayCount;
+    }
+
+    const leaderboard = Object.entries(userDone)
+      .map(([user, count]) => ({ user, count, maintain: userMaintain[user] || 0, progress: userProgress[user] || 0 }))
+      .sort((a, b) => b.count - a.count);
+
+    const badges = [];
+    if (leaderboard.length > 0) {
+      badges.push({ icon: '\ud83c\udfc6', label: 'Most Tasks', user: leaderboard[0].user, detail: leaderboard[0].count + ' tasks' });
+    }
+    if (mostOverdueUser) {
+      badges.push({ icon: '\ud83e\uddf9', label: 'Deep Clean', user: mostOverdueUser, detail: mostOverdueTask + ' (+' + mostOverdueDays + 'd)' });
+    }
+    const proEntries = Object.entries(userMaintain).sort((a, b) => b[1] - a[1]);
+    if (proEntries.length > 0 && proEntries[0][1] > 0) {
+      badges.push({ icon: '\u2b50', label: 'Proactive', user: proEntries[0][0], detail: proEntries[0][1] + ' early cleans' });
+    }
+
+    return { totalDue, totalDone, leaderboard, badges, dailyDone, dateRange: dates };
+  }
+
+  const thisWeek = computePeriod(thisMonday, thisSunday);
+  const lastWeek = computePeriod(lastMonday, lastSunday);
+  const thisMonth = computePeriod(thisMonthStart, thisMonthEnd);
+  const lastMonth = computePeriod(lastMonthStart, prevMonthEnd);
+
+  // 30-day heatmap data: per-user rows + total
+  const users = DATA.users || [];
+  const heatmapDays = [];
+  const heatmapByUser = {}; // user -> [{date, count}]
+  const heatmapTotal = [];  // [{date, count}]
+  for (const u of users) heatmapByUser[u] = [];
+
+  for (let i = 29; i >= 0; i--) {
+    const d = addDays(t, -i);
+    const perUser = {};
+    for (const u of users) perUser[u] = 0;
+    let total = 0;
+    for (const item of items) {
+      if (item.task) {
+        const e = DATA.entries[d]?.[item.room.id]?.tasks?.[item.task.id];
+        if (e?.cleaned) { total++; const u = e.user || '?'; if (perUser[u] !== undefined) perUser[u]++; }
+      } else {
+        const e = DATA.entries[d]?.[item.room.id];
+        if (e?.cleaned) { total++; const u = e.user || '?'; if (perUser[u] !== undefined) perUser[u]++; }
+      }
+    }
+    heatmapDays.push(d);
+    for (const u of users) heatmapByUser[u].push({ date: d, count: perUser[u], isToday: d === t });
+    heatmapTotal.push({ date: d, count: total, isToday: d === t });
+  }
+
+  // Streak: consecutive days with at least 1 task done ending today
+  let streak = 0;
+  for (let i = 0; i <= 60; i++) {
+    const d = addDays(t, -i);
+    let any = false;
+    for (const item of items) {
+      if (item.task) {
+        if (DATA.entries[d]?.[item.room.id]?.tasks?.[item.task.id]?.cleaned) { any = true; break; }
+      } else {
+        if (DATA.entries[d]?.[item.room.id]?.cleaned) { any = true; break; }
+      }
+    }
+    if (any) streak++;
+    else break;
+  }
+
+  // MVP: user with most tasks done in last 7 days
+  const last7 = {};
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(t, -i);
+    for (const item of items) {
+      if (item.task) {
+        const e = DATA.entries[d]?.[item.room.id]?.tasks?.[item.task.id];
+        if (e?.cleaned) { const u = e.user || '?'; last7[u] = (last7[u] || 0) + 1; }
+      } else {
+        const e = DATA.entries[d]?.[item.room.id];
+        if (e?.cleaned) { const u = e.user || '?'; last7[u] = (last7[u] || 0) + 1; }
+      }
+    }
+  }
+  const mvp = Object.entries(last7).sort((a, b) => b[1] - a[1])[0];
+
+  // Month names for labels
+  const thisMonthName = new Date(thisMonthStart + 'T12:00:00').toLocaleDateString(undefined, { month: 'long' });
+  const lastMonthName = new Date(lastMonthStart + 'T12:00:00').toLocaleDateString(undefined, { month: 'long' });
+
+  return {
+    today: { hitList, doneByUser, doneCount: doneToday.length, cleanCount },
+    thisWeek, lastWeek, thisMonth, lastMonth,
+    totalTasks: items.length,
+    heatmapDays, heatmapByUser, heatmapTotal, users,
+    streak, mvp, roomHealth, thisMonthName, lastMonthName
+  };
+}
+
+function renderReview() {
+  const data = computeReviewData();
+  const p = getPalette();
+  const cleanClr = `rgb(${p.clean.join(',')})`;
+  const dirtyClr = `rgb(${p.dirty.join(',')})`;
+  let html = '';
+
+  // ── HERO STATS ──
+  const pct = data.totalTasks > 0 ? Math.round(data.today.cleanCount / data.totalTasks * 100) : 100;
+  html += '<div class="hero-stats">';
+  html += `<div class="hero-card" style="border-top:3px solid ${cleanClr}">`;
+  html += `<span class="hero-emoji">\u2705</span>`;
+  html += `<span class="hero-val">${data.today.doneCount}</span>`;
+  html += `<span class="hero-label">Done Today</span></div>`;
+
+  html += `<div class="hero-card" style="border-top:3px solid ${pct >= 80 ? cleanClr : pct >= 50 ? 'var(--accent)' : dirtyClr}">`;
+  html += `<span class="hero-emoji">\ud83c\udfe0</span>`;
+  html += `<span class="hero-val">${pct}%</span>`;
+  html += `<span class="hero-label">Clean</span>`;
+  html += `<span class="hero-sub">${data.today.cleanCount}/${data.totalTasks} tasks</span></div>`;
+
+  html += `<div class="hero-card" style="border-top:3px solid ${data.streak >= 7 ? cleanClr : data.streak >= 3 ? 'var(--accent)' : dirtyClr}">`;
+  html += `<span class="hero-emoji">\ud83d\udd25</span>`;
+  html += `<span class="hero-val">${data.streak}</span>`;
+  html += `<span class="hero-label">Day Streak</span></div>`;
+
+  html += `<div class="hero-card" style="border-top:3px solid var(--accent)">`;
+  html += `<span class="hero-emoji">\ud83c\udfc5</span>`;
+  if (data.mvp) {
+    html += `<span class="hero-val">${esc(data.mvp[0])}</span>`;
+    html += `<span class="hero-label">7-Day MVP</span>`;
+    html += `<span class="hero-sub">${data.mvp[1]} tasks</span>`;
+  } else {
+    html += `<span class="hero-val">\u2014</span>`;
+    html += `<span class="hero-label">7-Day MVP</span>`;
+  }
+  html += '</div></div>';
+
+  // ── 30-DAY ACTIVITY HEATMAP (per-user + total grid) ──
+  const numDays = data.heatmapDays.length;
+  const maxTotal = Math.max(1, ...data.heatmapTotal.map(h => h.count));
+  const maxPerUser = {};
+  for (const u of data.users) {
+    maxPerUser[u] = Math.max(1, ...data.heatmapByUser[u].map(h => h.count));
+  }
+
+  html += '<div class="heatmap-section">';
+  html += '<div class="heatmap-label">\ud83d\udcc8 Activity</div>';
+
+  // CSS grid: label column + N day columns, all 1fr to fill width
+  html += `<div class="heatmap-grid" style="grid-template-columns: 60px repeat(${numDays}, 1fr)">`;
+
+  // Build month spans and week spans from heatmapDays
+  const monthSpans = []; // [{label, startCol, span}]
+  const weekSpans = [];  // [{label, startCol, span}]
+  let curMonth = '', curMonthStart = 0, curMonthCount = 0;
+  let curWeekMon = '', curWeekStart = 0, curWeekCount = 0, curWeekLabel = '';
+
+  for (let i = 0; i < numDays; i++) {
+    const d = data.heatmapDays[i];
+    const dt = new Date(d + 'T12:00:00');
+    // Month
+    const mo = dt.toLocaleDateString(undefined, { month: 'short' });
+    if (mo !== curMonth) {
+      if (curMonthCount > 0) monthSpans.push({ label: curMonth, startCol: curMonthStart + 2, span: curMonthCount });
+      curMonth = mo; curMonthStart = i; curMonthCount = 1;
+    } else { curMonthCount++; }
+    // Week (ISO week Monday)
+    const day = dt.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    const mon = new Date(dt); mon.setDate(mon.getDate() + diff);
+    const monKey = mon.toISOString().slice(0, 10);
+    if (monKey !== curWeekMon) {
+      // ISO week number: Thursday of the week determines the year/week
+      const thu = new Date(mon); thu.setDate(thu.getDate() + 3);
+      const jan1 = new Date(thu.getFullYear(), 0, 1);
+      const isoWk = Math.ceil(((thu - jan1) / 86400000 + 1) / 7);
+      if (curWeekCount > 0) weekSpans.push({ label: curWeekLabel, startCol: curWeekStart + 2, span: curWeekCount });
+      curWeekMon = monKey; curWeekStart = i; curWeekCount = 1;
+      curWeekLabel = 'Week ' + isoWk;
+    } else { curWeekCount++; }
+  }
+  if (curMonthCount > 0) monthSpans.push({ label: curMonth, startCol: curMonthStart + 2, span: curMonthCount });
+  if (curWeekCount > 0) weekSpans.push({ label: curWeekLabel, startCol: curWeekStart + 2, span: curWeekCount });
+
+  // Month header row (grid row 1)
+  html += '<div class="heatmap-span-header month-hdr" style="grid-row:1;grid-column:1"></div>';
+  for (let mi = 0; mi < monthSpans.length; mi++) {
+    const ms = monthSpans[mi];
+    const alt = mi % 2 === 0 ? 'span-even' : 'span-odd';
+    html += `<div class="heatmap-span-header month-hdr ${alt}" style="grid-row:1;grid-column: ${ms.startCol} / span ${ms.span}">${ms.label}</div>`;
+  }
+
+  // Week header row (grid row 2)
+  html += '<div class="heatmap-span-header week-hdr" style="grid-row:2;grid-column:1"></div>';
+  for (let wi = 0; wi < weekSpans.length; wi++) {
+    const ws = weekSpans[wi];
+    const alt = wi % 2 === 0 ? 'span-even' : 'span-odd';
+    const lbl = ws.span >= 4 ? ws.label : ws.span >= 2 ? ws.label.replace('Week ', 'W') : '';
+    html += `<div class="heatmap-span-header week-hdr ${alt}" style="grid-row:2;grid-column: ${ws.startCol} / span ${ws.span}">${lbl}</div>`;
+  }
+
+  // Day-of-week header row (grid row 3)
+  html += '<div class="heatmap-day-header" style="grid-row:3;grid-column:1"></div>';
+  for (let i = 0; i < numDays; i++) {
+    const dt = new Date(data.heatmapDays[i] + 'T12:00:00');
+    const wd = ['S','M','T','W','T','F','S'][dt.getDay()];
+    html += `<div class="heatmap-day-header" style="grid-row:3;grid-column:${i + 2}">${wd}</div>`;
+  }
+
+  // Per-user rows (grid rows 4+)
+  const dataRowStart = 4;
+  for (let ui = 0; ui < data.users.length; ui++) {
+    const u = data.users[ui];
+    const mx = maxPerUser[u];
+    const row = dataRowStart + ui;
+    html += `<div class="heatmap-user-label" style="grid-row:${row};grid-column:1">${esc(u)}</div>`;
+    for (let i = 0; i < data.heatmapByUser[u].length; i++) {
+      const h = data.heatmapByUser[u][i];
+      const intensity = h.count / mx;
+      const bg = h.count === 0 ? 'var(--head-bg)' : cellColor(1 - intensity, false);
+      const cls = h.isToday ? ' today-cell' : '';
+      const dLbl = dayLabel(h.date);
+      html += `<span class="heatmap-cell${cls}" style="grid-row:${row};grid-column:${i + 2};background:${bg}" title="${esc(u)} \u2014 ${dLbl}: ${h.count}">${h.count || ''}</span>`;
+    }
+  }
+
+  // Separator row
+  const sepRow = dataRowStart + data.users.length;
+  html += `<div class="heatmap-separator" style="grid-row:${sepRow}"></div>`;
+
+  // Total row
+  const totalRow = sepRow + 1;
+  html += `<div class="heatmap-user-label total-label" style="grid-row:${totalRow};grid-column:1">Total</div>`;
+  for (let i = 0; i < data.heatmapTotal.length; i++) {
+    const h = data.heatmapTotal[i];
+    const intensity = h.count / maxTotal;
+    const bg = h.count === 0 ? 'var(--head-bg)' : cellColor(1 - intensity, false);
+    const cls = h.isToday ? ' today-cell' : '';
+    const dLbl = dayLabel(h.date);
+    html += `<span class="heatmap-cell${cls}" style="grid-row:${totalRow};grid-column:${i + 2};background:${bg}" title="Total \u2014 ${dLbl}: ${h.count}">${h.count || ''}</span>`;
+  }
+
+  html += '</div>'; // end grid
+  html += '</div>'; // end heatmap section
+
+  // ── TODAY SECTION ──
+  html += '<div class="review-section">';
+  html += '<div class="review-section-header" data-review-toggle><h4>\ud83d\udccc Today</h4><span class="review-toggle">\u25bc</span></div>';
+  html += '<div class="review-section-body">';
+  html += '<div class="review-grid-today">';
+
+  // Left column: Hit list
+  html += '<div>';
+  if (data.today.hitList.length === 0) {
+    html += '<div class="all-clean"><span class="all-clean-emoji">\u2728</span>Everything\'s clean!<br>Nothing overdue.</div>';
+  } else {
+    const top = Math.min(5, data.today.hitList.length);
+    html += `<div class="review-sub-label">\ud83c\udfaf Top ${top} to focus on</div>`;
+    html += '<ul class="hit-list">';
+    for (let i = 0; i < top; i++) {
+      const h = data.today.hitList[i];
+      const isTop = i < 3;
+      const bg = cellColor(h.ratio, false);
+      const fg = cellTextColor(h.ratio);
+      html += `<li style="background:${bg};color:${fg}">`;
+      html += `<span class="hit-rank${isTop ? ' top' : ''}">${i + 1}</span>`;
+      html += `<span class="hit-detail"><span class="hit-task">${esc(h.task)}</span>`;
+      if (h.room) html += `<span class="hit-room"> \u2014 ${esc(h.room)}</span>`;
+      html += '</span>';
+      html += `<span class="hit-overdue" style="background:${dirtyClr};color:#fff">+${h.daysOverdue}d</span>`;
+      html += '</li>';
+    }
+    html += '</ul>';
+    if (data.today.hitList.length > 5) {
+      html += `<div style="font-size:.7rem;color:var(--desc-text);margin-top:4px;text-align:center">\u2026 and ${data.today.hitList.length - 5} more overdue</div>`;
+    }
+  }
+  html += '</div>';
+
+  // Right column: Done today + Room health
+  html += '<div>';
+  const userNames = Object.keys(data.today.doneByUser);
+  if (userNames.length > 0) {
+    html += `<div class="review-sub-label">\u2705 Done today (${data.today.doneCount})</div>`;
+    for (const user of userNames) {
+      const tasks = data.today.doneByUser[user];
+      html += '<div class="done-group">';
+      html += `<div class="done-user">${esc(user)} <span class="done-count">${tasks.length} task${tasks.length !== 1 ? 's' : ''}</span></div>`;
+      html += '<div class="done-tasks">';
+      for (const tk of tasks) {
+        const label = tk.room ? `${tk.task} (${tk.room})` : tk.task;
+        html += `<span class="done-tag">${esc(label)}</span>`;
+      }
+      html += '</div></div>';
+    }
+  } else {
+    html += '<div class="review-sub-label">\u2705 Done today</div>';
+    html += '<div style="font-size:.78rem;color:var(--desc-text);padding:8px 0">No tasks completed yet.</div>';
+  }
+
+  // Room health mini-cards
+  html += '<div class="review-sub-label" style="margin-top:12px">\ud83c\udfe0 Room Health</div>';
+  html += '<div class="room-health-grid">';
+  for (const rh of data.roomHealth) {
+    const bg = cellColor(rh.ratio, false);
+    const fg = cellTextColor(rh.ratio);
+    html += `<div class="room-health-card" style="background:${bg};color:${fg}">`;
+    html += `<div class="rhc-name">${esc(rh.name)}</div>`;
+    html += `<div class="rhc-frac">${rh.fraction}</div>`;
+    html += '</div>';
+  }
+  html += '</div>';
+
+  html += '</div>'; // end right column
+  html += '</div>'; // end grid
+  html += '</div></div>'; // end today section
+
+  // ── WEEK/PERIOD RENDERER ──
+  function renderPeriodCard(label, periodData, collapsed) {
+    const colCls = collapsed ? ' collapsed' : '';
+    let w = `<div class="review-section${colCls}">`;
+    w += `<div class="review-section-header" data-review-toggle><h4>${label}</h4><span class="review-toggle">\u25bc</span></div>`;
+    w += '<div class="review-section-body">';
+
+    // Stats bar
+    w += '<div class="week-stats">';
+    w += `<div class="week-stat">\ud83d\udccb Due: <span class="week-stat-val">${periodData.totalDue}</span></div>`;
+    w += `<div class="week-stat">\u2705 Done: <span class="week-stat-val" style="color:${cleanClr}">${periodData.totalDone}</span></div>`;
+    const net = periodData.totalDone - periodData.totalDue;
+    const netColor = net >= 0 ? cleanClr : dirtyClr;
+    const netSign = net >= 0 ? '+' : '';
+    w += `<div class="week-stat">Net: <span class="week-stat-val" style="color:${netColor}">${netSign}${net}</span></div>`;
+    w += '</div>';
+
+    // Leaderboard
+    if (periodData.leaderboard.length > 0) {
+      const medals = ['\ud83e\udd47', '\ud83e\udd48', '\ud83e\udd49'];
+      const maxCount = periodData.leaderboard[0].count;
+      w += '<div class="leaderboard">';
+      for (let i = 0; i < periodData.leaderboard.length; i++) {
+        const lb = periodData.leaderboard[i];
+        const pct = maxCount > 0 ? (lb.count / maxCount * 100) : 0;
+        w += '<div class="lb-row">';
+        w += `<span class="lb-medal">${medals[i] || ''}</span>`;
+        w += `<span class="lb-rank">${i + 1}</span>`;
+        w += `<span class="lb-name">${esc(lb.user)}</span>`;
+        w += `<span class="lb-bar-wrap"><span class="lb-bar" style="width:${pct}%;background:${cleanClr}"></span></span>`;
+        w += `<span class="lb-count">${lb.count}</span>`;
+        w += `<span class="lb-breakdown">${lb.progress}\u2191 ${lb.maintain}\u21bb</span>`;
+        w += '</div>';
+      }
+      w += '</div>';
+
+      if (periodData.badges.length > 0) {
+        w += '<div class="badge-row">';
+        for (const b of periodData.badges) {
+          w += `<span class="badge"><span class="badge-icon">${b.icon}</span> <span class="badge-user">${esc(b.user)}</span> \u2014 ${esc(b.label)}</span>`;
+        }
+        w += '</div>';
+      }
+    } else {
+      w += '<div style="font-size:.78rem;color:var(--desc-text);text-align:center;padding:10px 0">No activity this period.</div>';
+    }
+
+    w += '</div></div>';
+    return w;
+  }
+
+  // ── WEEKS (side by side on desktop) ──
+  html += '<div class="review-grid-2">';
+  html += renderPeriodCard('\ud83d\udcc5 This Week', data.thisWeek, false);
+  html += renderPeriodCard('\u23ea Last Week', data.lastWeek, false);
+  html += '</div>';
+
+  // ── MONTHS (side by side on desktop) ──
+  html += '<div class="review-grid-2">';
+  html += renderPeriodCard('\ud83d\udcc6 ' + data.thisMonthName, data.thisMonth, false);
+  html += renderPeriodCard('\ud83d\udcc4 ' + data.lastMonthName, data.lastMonth, true);
+  html += '</div>';
+
+  $('#review-content').innerHTML = html;
+
+  // Wire up collapsible toggles
+  for (const hdr of $('#review-content').querySelectorAll('[data-review-toggle]')) {
+    hdr.addEventListener('click', () => {
+      hdr.closest('.review-section').classList.toggle('collapsed');
+    });
+  }
+}
+
 // ── Render ───────────────────────────────────────────────────
 function renderTable(animate) {
   const dates = visibleDates();
@@ -1810,6 +2635,8 @@ $('#new-task-label').addEventListener('input', () => {
 });
 
 $('#btn-add-room').addEventListener('click', () => openRoomManager());
+$('#btn-review').addEventListener('click', () => { renderReview(); $('#review-dialog').showModal(); });
+$('#review-close').addEventListener('click', () => $('#review-dialog').close());
 $('#rm-close').addEventListener('click', () => $('#room-manager-dialog').close());
 $('#rm-add-room').addEventListener('click', () => { $('#room-manager-dialog').close(); _roomDialogFromManager = true; openRoomDialog(null); });
 $('#room-manager-list').addEventListener('click', e => {

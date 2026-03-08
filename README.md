@@ -21,9 +21,21 @@ A single-page, open-source household chore dashboard designed for always-on tabl
 ### Display
 
 - **Today column highlight** — current day column emphasized with a blue inset border and auto-scrolled into view
-- **Footer summary row** — sticky bottom row showing clean/total counts per day, scoped to the current view or drill-down
+- **Date navigation** — arrow icons on the first and last date column headers let you shift the visible date window forward or backward
+- **Footer summary row** — sticky bottom row showing maintain/proactive/newly-due breakdown per day, scoped to the current view or drill-down
 - **Cell tooltip** — hover or long-press a cell to see detailed status (days since cleaned, days until due, who cleaned, projected state for future dates)
 - **Sparkline history** — compact canvas chart in the top bar showing clean vs overdue trends over a configurable period, with Sunday tick marks
+
+### 📊 Review Dashboard
+
+- **Full-width infographic** — opens as a modal dialog (up to 1200px wide) with hero stats, heatmaps, leaderboards, and room health cards
+- **Hero stats** — four cards at the top showing tasks done today, overall clean percentage, current activity streak, and 7-day MVP
+- **Activity heatmap** — 30-day grid with per-user rows and a total row; cells colored by intensity; month and ISO week header rows with alternating backgrounds to show period boundaries
+- **Today section** — two-column layout with a prioritized hit list (top 5 most overdue tasks) on the left and done-today grouped by user plus room health mini-cards on the right
+- **Weekly comparison** — This Week and Last Week side-by-side, each with due/done/net stats, user leaderboard with progress bars, medal rankings, maintain/progress breakdown, and badges (Most Tasks, Deep Clean, Proactive)
+- **Monthly comparison** — This Month and Last Month side-by-side with the same leaderboard and badge format
+- **Collapsible sections** — each period card can be collapsed/expanded with a click
+- **Responsive** — collapses to single-column on tablet (768px), compact mode on phone (480px) with heatmap numbers hidden
 
 ### Users & Settings
 
@@ -112,7 +124,8 @@ For kiosk mode:
 7. **Tap again to undo** — toggle off a mistaken entry
 8. **Drill down** — tap a room name (Room View) or task type name (Task View) to see the breakdown; tap ← Back to return
 9. **Adjust settings** — click ⚙ to change visible days, history range, color theme, or import/export data
-10. **Install as app** — use your browser's "Add to Home Screen" or "Install App" option for a standalone kiosk experience
+10. **Review progress** — tap 📊 Review in the top bar to open the full-width dashboard with hero stats, activity heatmap, hit list, leaderboards, and room health cards
+11. **Install as app** — use your browser's "Add to Home Screen" or "Install App" option for a standalone kiosk experience
 
 ## Project Structure
 
