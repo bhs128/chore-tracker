@@ -33,13 +33,22 @@ Examples:
 import argparse
 import asyncio
 import json
+import logging
 import mimetypes
 import os
 import subprocess
+import tempfile
 import time
 from http import HTTPStatus
 from pathlib import Path
 from urllib.parse import unquote, urlparse
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+log = logging.getLogger("chore-server")
 
 try:
     import websockets
@@ -103,21 +112,37 @@ def guess_mime(filepath: str) -> str:
 # ── Persistence helpers ───────────────────────────────────────
 def read_data() -> str:
     """Return the raw JSON string from disk (or '{}' if missing)."""
-    if os.path.exists(data_file):
+    try:
         with open(data_file, "r") as f:
             return f.read()
-    return "{}"
+    except FileNotFoundError:
+        return "{}"
+    except OSError:
+        log.exception("Failed to read data file %s", data_file)
+        return "{}"
 
 
 def write_data(body: str) -> int:
-    """Write JSON to disk, stamping a _version field. Returns the new version."""
+    """Atomically write JSON to disk, stamping a _version field. Returns the new version."""
     try:
         obj = json.loads(body)
     except json.JSONDecodeError:
         raise ValueError("Invalid JSON")
     obj["_version"] = int(time.time() * 1000)
-    with open(data_file, "w") as f:
-        json.dump(obj, f)
+    # Write to a temp file then atomically rename to avoid corruption
+    dir_name = os.path.dirname(os.path.abspath(data_file)) or "."
+    fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(obj, f)
+        os.replace(tmp_path, data_file)
+    except BaseException:
+        # Clean up the temp file if anything goes wrong
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
     return obj["_version"]
 
 
@@ -132,6 +157,7 @@ async def broadcast(version: int, sender=None):
             await ws.send(msg)
         except Exception:
             CLIENTS.discard(ws)
+            log.info("Removed stale WebSocket client during broadcast")
 
 
 # ── HTTP Server (REST API) ────────────────────────────────────
@@ -145,12 +171,22 @@ CORS_HEADERS = (
 class RESTProtocol(asyncio.Protocol):
     """Minimal HTTP/1.1 protocol handler for the REST API."""
 
+    # Maximum request size (headers + body): 1 MB
+    MAX_REQUEST_SIZE = 1 * 1024 * 1024
+
     def connection_made(self, transport):
         self.transport = transport
         self._buf = b""
 
     def data_received(self, data):
         self._buf += data
+
+        # Guard against excessively large requests
+        if len(self._buf) > self.MAX_REQUEST_SIZE:
+            log.warning("Request too large (%d bytes), dropping connection", len(self._buf))
+            self._respond(413, "Request too large\n")
+            return
+
         # Wait until we have full headers
         if b"\r\n\r\n" not in self._buf:
             return
@@ -173,15 +209,30 @@ class RESTProtocol(asyncio.Protocol):
                 k, v = line.split(":", 1)
                 headers[k.strip().lower()] = v.strip()
 
-        content_length = int(headers.get("content-length", 0))
+        try:
+            content_length = int(headers.get("content-length", 0))
+        except ValueError:
+            self._respond(400, "Invalid Content-Length\n")
+            return
+
         body = self._buf[body_start : body_start + content_length]
 
         # Wait for full body
         if len(body) < content_length:
             return
 
-        # Route
-        asyncio.ensure_future(self._handle(method, path, body))
+        # Route — schedule and log any unexpected errors
+        task = asyncio.ensure_future(self._handle(method, path, body))
+        task.add_done_callback(self._handle_task_error)
+
+    @staticmethod
+    def _handle_task_error(task):
+        """Log unhandled exceptions from request handler tasks."""
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc is not None:
+            log.exception("Unhandled error in request handler", exc_info=exc)
 
     async def _handle(self, method, path, body):
         if method == "OPTIONS":
@@ -233,7 +284,7 @@ class RESTProtocol(asyncio.Protocol):
     def _respond(self, status, body, content_type="text/plain", extra_headers=()):
         if isinstance(body, str):
             body = body.encode("utf-8")
-        reason = {200: "OK", 204: "No Content", 400: "Bad Request", 404: "Not Found"}.get(status, "OK")
+        reason = {200: "OK", 204: "No Content", 400: "Bad Request", 404: "Not Found", 413: "Payload Too Large"}.get(status, "OK")
         lines = [f"HTTP/1.1 {status} {reason}"]
         lines.append(f"Content-Type: {content_type}")
         lines.append(f"Content-Length: {len(body)}")
@@ -242,8 +293,11 @@ class RESTProtocol(asyncio.Protocol):
         lines.append("Connection: close")
         lines.append("")
         lines.append("")
-        self.transport.write("\r\n".join(lines).encode("utf-8") + body)
-        self.transport.close()
+        try:
+            self.transport.write("\r\n".join(lines).encode("utf-8") + body)
+            self.transport.close()
+        except Exception:
+            log.debug("Client disconnected before response could be sent")
 
 
 # ── WebSocket handler ─────────────────────────────────────────
@@ -264,6 +318,10 @@ async def ws_handler(websocket, path=None):
                 await websocket.send(
                     json.dumps({"type": "error", "message": "Invalid payload"})
                 )
+    except websockets.exceptions.ConnectionClosed as exc:
+        log.info("WebSocket client disconnected: %s", exc)
+    except Exception:
+        log.exception("Unexpected error in WebSocket handler")
     finally:
         CLIENTS.discard(websocket)
 
@@ -278,12 +336,12 @@ async def main(port: int):
     # Start WebSocket server on port+1
     ws_port = port + 1
     ws_server = await ws_serve(ws_handler, "0.0.0.0", ws_port)
-    print(f"Chore Tracker sync server running")
-    print(f"  REST:      http://0.0.0.0:{port}/data")
-    print(f"  WebSocket: ws://0.0.0.0:{ws_port}")
-    print(f"  Data file: {os.path.abspath(data_file)}")
+    log.info("Chore Tracker sync server running")
+    log.info("  REST:      http://0.0.0.0:%d/data", port)
+    log.info("  WebSocket: ws://0.0.0.0:%d", ws_port)
+    log.info("  Data file: %s", os.path.abspath(data_file))
     if static_root:
-        print(f"  Static:    http://0.0.0.0:{port}/  → {os.path.abspath(static_root)}")
+        log.info("  Static:    http://0.0.0.0:%d/  → %s", port, os.path.abspath(static_root))
     await asyncio.Future()  # run forever
 
 
