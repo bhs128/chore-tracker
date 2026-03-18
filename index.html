@@ -296,10 +296,9 @@ dialog .dialog-actions { display: flex; gap: 8px; margin-top: 16px; justify-cont
 
 /* ── Sync status indicator ──────────────────────────────────── */
 #sync-status {
-  display: none; flex-shrink: 0; align-items: center; gap: 4px;
+  display: flex; flex-shrink: 0; align-items: center; gap: 4px;
   font-size: .65rem; color: var(--desc-text); white-space: nowrap; cursor: default;
 }
-#sync-status.visible { display: flex; }
 #sync-dot {
   width: 8px; height: 8px; border-radius: 50%;
   background: #888; transition: background .3s;
@@ -307,6 +306,8 @@ dialog .dialog-actions { display: flex; gap: 8px; margin-top: 16px; justify-cont
 #sync-dot.connected    { background: #2ecc71; }
 #sync-dot.disconnected { background: #e74c3c; }
 #sync-dot.syncing      { background: #f1c40f; }
+#sync-dot.local        { background: #888; }
+#sync-dot.demo         { background: #9b59b6; }
 
 /* ── Responsive tweaks for smaller tablets ─────────────────── */
 @media (max-width: 900px) {
@@ -830,6 +831,7 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
   <label for="settings-api-url">Sync server URL <span style="font-weight:400;color:var(--desc-text)">(optional)</span></label>
   <input id="settings-api-url" type="url" placeholder="e.g. http://192.168.1.50:8780" style="font-size:.78rem">
   <div style="font-size:.68rem;color:var(--desc-text);margin-top:2px">Leave blank to auto-detect. When served from <code>server.py</code>, sync uses the current origin automatically. Set a URL to override, or open as a local file for offline-only mode.</div>
+  <div id="settings-mode-info" style="margin-top:6px;padding:6px 8px;border-radius:6px;font-size:.72rem;border:1px solid var(--bar-border)"></div>
   <label>Users</label>
   <div id="settings-user-list"></div>
   <div id="add-user-settings">
@@ -951,6 +953,28 @@ function save() {
 }
 
 // ── Sync Layer ───────────────────────────────────────────────
+
+/**
+ * Detect the current operating mode:
+ *   'synced'  — served from server.py with live sync (REST + WebSocket)
+ *   'demo'    — served over HTTP(S) but no sync API available (e.g. GitHub Pages)
+ *   'local'   — opened as a local file:// with no server
+ */
+function getMode() {
+  const url = getApiUrl();
+  if (!url) return 'local';
+  if (_syncReady) return 'synced';  // REST sync active (WS may reconnect momentarily)
+  // URL is set but we haven't synced yet — could be demo or synced, report based on protocol
+  if (location.protocol === 'file:') return 'local';
+  return 'demo';  // will upgrade to 'synced' once syncInit succeeds
+}
+
+const MODE_INFO = {
+  local:  { dot: 'local',  label: 'Local only',   icon: '💾', desc: 'Data is stored only in this browser. No server sync.' },
+  demo:   { dot: 'demo',   label: 'Demo',         icon: '👁', desc: 'Served remotely but not syncing. Changes stay in this browser only.' },
+  synced: { dot: 'connected', label: 'Synced',     icon: '☁️', desc: 'Connected to sync server. Changes are saved to the server and shared across devices.' },
+};
+
 function getApiUrl() {
   const explicit = (DATA?.settings?.apiUrl || '').replace(/\/+$/, '');
   if (explicit) return explicit;
@@ -963,12 +987,28 @@ function setSyncStatus(state, label) {
   const el = $('#sync-status');
   const dot = $('#sync-dot');
   const lbl = $('#sync-label');
-  if (!getApiUrl()) { el.classList.remove('visible'); return; }
-  el.classList.add('visible');
   dot.className = '';
   dot.id = 'sync-dot';
-  dot.classList.add(state);  // connected | disconnected | syncing
-  if (label) lbl.textContent = label;
+  if (state) {
+    dot.classList.add(state);  // connected | disconnected | syncing
+    if (label) lbl.textContent = label;
+  } else {
+    // No explicit state — use mode
+    updateModeIndicator();
+  }
+}
+
+function updateModeIndicator() {
+  const mode = getMode();
+  const info = MODE_INFO[mode];
+  const dot = $('#sync-dot');
+  const lbl = $('#sync-label');
+  // Don't override if we're actively syncing/connected with a live state
+  if (dot.classList.contains('syncing')) return;
+  dot.className = '';
+  dot.id = 'sync-dot';
+  dot.classList.add(info.dot);
+  lbl.textContent = info.label;
 }
 
 async function syncPull() {
@@ -1070,10 +1110,16 @@ function connectWebSocket() {
 }
 
 async function syncInit() {
-  if (!getApiUrl()) return;
+  if (!getApiUrl()) { updateModeIndicator(); return; }
   await syncPull();
-  _syncReady = true;
-  connectWebSocket();
+  // If pull succeeded (dot is connected/syncing), enter synced mode
+  const dot = $('#sync-dot');
+  if (dot.classList.contains('connected') || dot.classList.contains('syncing')) {
+    _syncReady = true;
+    connectWebSocket();
+  }
+  // Otherwise we're in demo mode (served over HTTP but no /data endpoint)
+  updateModeIndicator();
 }
 
 // ── View State ───────────────────────────────────────────────
@@ -2696,6 +2742,11 @@ $('#btn-settings').addEventListener('click', () => {
   const autoUrl = (!DATA.settings.apiUrl && (location.protocol === 'http:' || location.protocol === 'https:')) ? location.origin + ' (auto-detected)' : 'e.g. http://192.168.1.50:8780';
   $('#settings-api-url').placeholder = autoUrl;
   renderSettingsUsers();
+  // Show mode info
+  const mode = getMode();
+  const info = MODE_INFO[mode];
+  const modeEl = $('#settings-mode-info');
+  modeEl.innerHTML = `<strong>${info.icon} ${info.label}</strong><br><span style="font-size:.66rem;color:var(--desc-text)">${info.desc}</span>`;
   // Show version
   updateVersionDisplay();
   $('#settings-dialog').showModal();
@@ -2773,7 +2824,20 @@ $('#settings-import-file').addEventListener('change', e => {
   e.target.value = '';
 });
 $('#settings-reset').addEventListener('click', () => {
-  if (confirm('Erase ALL data and start fresh? This cannot be undone.')) {
+  const mode = getMode();
+  let msg;
+  if (mode === 'synced') {
+    msg = '⚠️ You are connected to the sync server.\n\n'
+        + 'This will erase ALL data on the server and all synced devices.\n\n'
+        + 'Are you sure? This cannot be undone.';
+  } else if (mode === 'demo') {
+    msg = 'This will erase your local browser data.\n\n'
+        + '(You are in demo mode — no server data will be affected.)\n\n'
+        + 'Continue?';
+  } else {
+    msg = 'Erase ALL local data and start fresh?\n\nThis cannot be undone.';
+  }
+  if (confirm(msg)) {
     DATA = defaultData();
     drillDown = null; drillDownOrder = null; viewMode = 'room';
     applyTheme();
