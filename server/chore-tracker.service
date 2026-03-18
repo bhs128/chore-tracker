@@ -8,6 +8,7 @@ WorkingDirectory=/root/chore-tracker
 ExecStart=/usr/bin/python3 /root/chore-tracker/server/server.py --port 80
 Restart=on-failure
 RestartSec=5
+SyslogIdentifier=chore-tracker
 
 [Install]
 WantedBy=multi-user.target
