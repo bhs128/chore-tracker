@@ -49,6 +49,9 @@ logging.basicConfig(
 )
 log = logging.getLogger("chore-server")
 
+# Suppress noisy websockets library logs (e.g. "server listening on ...")
+logging.getLogger("websockets").setLevel(logging.WARNING)
+
 try:
     import websockets
     try:
