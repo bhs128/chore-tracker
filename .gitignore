@@ -1,2 +1,5 @@
 chore-data.json
+chore-data-changelog.json
+chore-tracker-backup.json
 __pycache__/
+.venv/

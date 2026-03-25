@@ -244,25 +244,18 @@ td.cell-future  { background: var(--future-bg); color: var(--future-text); }
   white-space: nowrap; min-height: 34px; display: inline-flex; align-items: center;
 }
 .user-chip.selected { border-color: var(--accent); background: var(--chip-sel-bg); color: var(--text); }
-/* user management in settings */
-#settings-user-list {
+/* user management in users dialog */
+#users-dialog-list {
   display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;
 }
-#settings-user-list .user-chip {
+#users-dialog-list .user-chip {
   padding: 4px 10px; border-radius: 14px;
   background: var(--chip-bg); font-size: .78rem; cursor: default;
   border: 1px solid var(--input-border);
 }
-#settings-user-list .remove-user {
+#users-dialog-list .remove-user {
   margin-left: 4px; color: var(--accent); font-size: .7rem; cursor: pointer;
   font-weight: 700;
-}
-#add-user-settings {
-  display: flex; gap: 4px; margin-top: 6px;
-}
-#add-user-settings input {
-  flex: 1; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text);
-  padding: 5px 8px; border-radius: 6px; font-size: .82rem;
 }
 
 /* ── Sparkline history (top bar) ──────────────────────────── */
@@ -734,7 +727,7 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
 
     <!-- User selector -->
     <div id="user-section">
-      <span class="label">👤</span>
+      <span class="label" id="user-manage-btn" style="cursor:pointer" title="Manage users">👤</span>
       <div id="user-list"></div>
     </div>
 
@@ -881,9 +874,22 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
       </tbody>
     </table>
   </div>
-  <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+  <div style="margin-top:12px">
     <button id="conn-test-btn" class="primary" style="font-size:.78rem;padding:4px 14px">🔍 Test Connection</button>
-    <span id="conn-test-result" style="font-size:.72rem;color:var(--desc-text)"></span>
+    <div id="conn-test-result" style="font-size:.72rem;color:var(--desc-text);margin-top:6px"></div>
+  </div>
+</dialog>
+
+<!-- Users dialog -->
+<dialog id="users-dialog">
+  <div class="dialog-header">
+    <h3>👤 Users</h3>
+    <button id="users-close" class="dialog-close-btn">✕</button>
+  </div>
+  <div id="users-dialog-list"></div>
+  <div id="add-user-row" style="display:flex;gap:4px;margin-top:8px">
+    <input id="new-user-input" placeholder="Add user…" maxlength="20">
+    <button id="btn-add-user">+</button>
   </div>
 </dialog>
 
@@ -921,12 +927,6 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
   <input id="settings-api-url" type="url" placeholder="e.g. http://192.168.1.50:8780" style="font-size:.78rem">
   <div style="font-size:.68rem;color:var(--desc-text);margin-top:2px">Leave blank to auto-detect. When served from <code>server.py</code>, sync uses the current origin automatically. Set a URL to override, or open as a local file for offline-only mode.</div>
   <div id="settings-mode-info" style="margin-top:6px;padding:6px 8px;border-radius:6px;font-size:.72rem;border:1px solid var(--bar-border)"></div>
-  <label>Users</label>
-  <div id="settings-user-list"></div>
-  <div id="add-user-settings">
-    <input id="new-user-input" placeholder="Add user…" maxlength="20">
-    <button id="btn-add-user">+</button>
-  </div>
   <div class="dialog-actions" style="flex-wrap:wrap">
     <button id="settings-export" style="font-size:.72rem;padding:6px 10px">Export JSON</button>
     <button id="settings-import" style="font-size:.72rem;padding:6px 10px">Import JSON</button>
@@ -1013,6 +1013,7 @@ let _syncPending = false;
 let _syncDirty = false;
 let _syncReady = false;  // true after first successful pull; prevents pushing stale/default data
 let _ws = null;
+let _wsConnecting = false;
 let _lastSyncTime = null;
 
 // ── Client Identity (persistent per device) ──────────────────
@@ -1216,14 +1217,16 @@ function syncPush() {
 function connectWebSocket() {
   const url = getApiUrl();
   if (!url) { if (_ws) { _ws.close(); _ws = null; } return; }
-  if (_ws) return;  // already connected
+  if (_ws || _wsConnecting) return;  // already connected or connecting
   // WS runs on REST port + 1
   const parsed = new URL(url);
   const wsPort = parseInt(parsed.port || (parsed.protocol === 'https:' ? 443 : 80)) + 1;
   const wsUrl = 'ws://' + parsed.hostname + ':' + wsPort;
+  _wsConnecting = true;
   try {
     const ws = new WebSocket(wsUrl);
     ws.onopen = () => {
+      _wsConnecting = false;
       _ws = ws;
       setSyncStatus('connected', 'Live');
       // Retry any changes that failed while offline
@@ -1239,14 +1242,17 @@ function connectWebSocket() {
       } catch {}
     };
     ws.onclose = () => {
+      _wsConnecting = false;
+      const wasConnected = _ws === ws;
       _ws = null;
       if (getApiUrl()) {
-        setSyncStatus('disconnected', 'Reconnecting…');
+        if (wasConnected) setSyncStatus('connected', 'Synced');  // REST still works
         setTimeout(connectWebSocket, 5000);
       }
     };
     ws.onerror = () => { ws.close(); };
   } catch {
+    _wsConnecting = false;
     _ws = null;
     setTimeout(connectWebSocket, 5000);
   }
@@ -2848,7 +2854,9 @@ function populateConnStatus() {
   if (hasServer) {
     $('#cs-ws').innerHTML = _ws && _ws.readyState === WebSocket.OPEN
       ? '<span class="cs-ok">● Connected</span>'
-      : '<span class="cs-warn">● Disconnected</span> <span style="font-size:.68rem;color:var(--desc-text)">(reconnects automatically)</span>';
+      : _wsConnecting
+        ? '<span class="cs-warn">● Connecting…</span>'
+        : '<span class="cs-warn">● Disconnected</span> <span style="font-size:.68rem;color:var(--desc-text)">(reconnects automatically)</span>';
     $('#cs-last-sync').textContent = _lastSyncTime ? new Date(_lastSyncTime).toLocaleTimeString() : '(not yet)';
     // Fetch server version live
     const verEl = $('#cs-server-ver');
@@ -2859,17 +2867,52 @@ function populateConnStatus() {
       verEl.innerHTML = '<span class="cs-err">unreachable</span>';
     });
   }
-  // Show/hide test button based on mode
-  $('#conn-test-btn').style.display = hasServer ? '' : 'none';
-  $('#conn-test-result').textContent = hasServer ? '' : 'No server to test — data is stored locally in this browser.';
+  // Show test button in all modes; test is mode-aware
+  $('#conn-test-btn').style.display = '';
+  const testRes = $('#conn-test-result');
+  if (_syncDirty) {
+    testRes.innerHTML = '<span class="cs-warn">⚠ Unsaved local changes waiting to push</span>';
+  } else {
+    testRes.innerHTML = '';
+  }
 }
 
 $('#conn-test-btn').addEventListener('click', async () => {
   const url = getApiUrl();
+  const mode = getMode();
   const resEl = $('#conn-test-result');
-  if (!url) { resEl.textContent = 'No server URL configured.'; return; }
-  resEl.textContent = 'Testing…';
+  resEl.innerHTML = 'Testing…';
+  const results = [];
   const t0 = performance.now();
+
+  // 1) localStorage test (all modes)
+  try {
+    const testKey = '_chore_test_' + Date.now();
+    localStorage.setItem(testKey, 'ok');
+    const readBack = localStorage.getItem(testKey);
+    localStorage.removeItem(testKey);
+    if (readBack === 'ok') {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      const bytes = stored ? stored.length : 0;
+      const kb = (bytes / 1024).toFixed(1);
+      results.push('<span class="cs-ok">✓ localStorage</span> — working, ' + kb + ' KB stored');
+    } else {
+      results.push('<span class="cs-err">✗ localStorage</span> — write succeeded but read-back failed');
+    }
+  } catch (e) {
+    results.push('<span class="cs-err">✗ localStorage</span> — ' + esc(e.message));
+  }
+
+  // For local mode, that's all we need
+  if (mode === 'local') {
+    const totalMs = Math.round(performance.now() - t0);
+    results.push('<span style="color:var(--desc-text)">⏱ Total: ' + totalMs + 'ms</span>');
+    resEl.innerHTML = results.join('<br>');
+    return;
+  }
+
+  // 2) REST read: GET /version + GET /data (demo + synced)
+  let serverVer = null, serverData = null;
   try {
     const [verRes, dataRes] = await Promise.all([
       fetch(url + '/version', { cache: 'no-store' }),
@@ -2878,18 +2921,88 @@ $('#conn-test-btn').addEventListener('click', async () => {
     const ms = Math.round(performance.now() - t0);
     if (verRes.ok && dataRes.ok) {
       const ver = await verRes.json();
-      const data = await dataRes.json();
-      const rooms = (data.rooms || []).length;
-      resEl.innerHTML = '<span class="cs-ok">✓ OK</span> — ' + ms + 'ms, server ' + esc(ver.version || '?') + ', ' + rooms + ' room(s)';
-      // refresh displayed values
-      $('#cs-server-ver').innerHTML = '<span class="cs-ok">' + esc(ver.version || 'unknown') + '</span>';
-      $('#cs-data-ver').textContent = data._version != null ? data._version : '?';
+      serverData = await dataRes.json();
+      serverVer = ver.version || '?';
+      const rooms = (serverData.rooms || []).length;
+      results.push('<span class="cs-ok">✓ REST read</span> — ' + ms + 'ms, v' + esc(serverVer) + ', ' + rooms + ' room(s)');
+      $('#cs-server-ver').innerHTML = '<span class="cs-ok">' + esc(serverVer) + '</span>';
+      $('#cs-data-ver').textContent = serverData._version != null ? serverData._version : '?';
     } else {
-      resEl.innerHTML = '<span class="cs-err">✗ Failed</span> — version:' + verRes.status + ' data:' + dataRes.status;
+      results.push('<span class="cs-err">✗ REST read</span> — version:' + verRes.status + ' data:' + dataRes.status);
     }
   } catch (e) {
-    resEl.innerHTML = '<span class="cs-err">✗ Unreachable</span> — ' + esc(e.message);
+    results.push('<span class="cs-err">✗ REST read</span> — ' + esc(e.message));
   }
+
+  // For demo mode, REST read is sufficient — it doesn't write
+  if (mode === 'demo') {
+    const totalMs = Math.round(performance.now() - t0);
+    results.push('<span style="color:var(--desc-text)">⏱ Total: ' + totalMs + 'ms</span>');
+    resEl.innerHTML = results.join('<br>');
+    return;
+  }
+
+  // 3) REST write: PUT /data with current data (synced only, idempotent)
+  try {
+    const payload = JSON.parse(JSON.stringify(DATA));
+    delete payload.selectedUser;
+    const t1 = performance.now();
+    const putRes = await fetch(url + '/data', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Client-Id': getClientId(),
+        'X-Client-Label': getClientLabel(),
+        'X-Base-Version': String(DATA._version || 0),
+      },
+      body: JSON.stringify(payload),
+      cache: 'no-store',
+    });
+    const ms2 = Math.round(performance.now() - t1);
+    if (putRes.ok) {
+      const putData = await putRes.json();
+      if (putData && putData.version) DATA._version = putData.version;
+      results.push('<span class="cs-ok">✓ REST write</span> — ' + ms2 + 'ms, version now ' + (putData.version || '?'));
+    } else if (putRes.status === 409) {
+      results.push('<span class="cs-warn">⚠ REST write</span> — version conflict (409), server has newer data');
+    } else {
+      results.push('<span class="cs-err">✗ REST write</span> — HTTP ' + putRes.status);
+    }
+  } catch (e) {
+    results.push('<span class="cs-err">✗ REST write</span> — ' + esc(e.message));
+  }
+
+  // 4) WebSocket: quick connect test (synced only)
+  try {
+    const parsed = new URL(url);
+    const wsPort = parseInt(parsed.port || (parsed.protocol === 'https:' ? 443 : 80)) + 1;
+    const wsUrl = 'ws://' + parsed.hostname + ':' + wsPort;
+    const wsOk = await new Promise((resolve) => {
+      const timeout = setTimeout(() => resolve(false), 5000);
+      try {
+        const testWs = new WebSocket(wsUrl);
+        testWs.onopen = () => { clearTimeout(timeout); testWs.close(); resolve(true); };
+        testWs.onerror = () => { clearTimeout(timeout); resolve(false); };
+      } catch { clearTimeout(timeout); resolve(false); }
+    });
+    if (wsOk) {
+      results.push('<span class="cs-ok">✓ WebSocket</span> — port ' + wsPort + ' reachable');
+      if (!_ws && !_wsConnecting) connectWebSocket();
+    } else {
+      results.push('<span class="cs-err">✗ WebSocket</span> — port ' + wsPort + ' unreachable (live updates from other devices won\'t work)');
+    }
+  } catch (e) {
+    results.push('<span class="cs-err">✗ WebSocket</span> — ' + esc(e.message));
+  }
+
+  // 5) Dirty data check
+  if (_syncDirty) {
+    results.push('<span class="cs-warn">⚠ Unsaved changes</span> — local changes are waiting to push');
+  }
+
+  const totalMs = Math.round(performance.now() - t0);
+  results.push('<span style="color:var(--desc-text)">⏱ Total: ' + totalMs + 'ms</span>');
+  resEl.innerHTML = results.join('<br>');
 });
 $('#changelog-close').addEventListener('click', () => $('#changelog-dialog').close());
 $('#changelog-refresh').addEventListener('click', () => fetchAndRenderChangelog());
@@ -3065,7 +3178,6 @@ $('#btn-settings').addEventListener('click', () => {
   // Show auto-detected URL as placeholder when no explicit URL is set
   const autoUrl = (!DATA.settings.apiUrl && (location.protocol === 'http:' || location.protocol === 'https:')) ? location.origin + ' (auto-detected)' : 'e.g. http://192.168.1.50:8780';
   $('#settings-api-url').placeholder = autoUrl;
-  renderSettingsUsers();
   // Show mode info
   const mode = getMode();
   const info = MODE_INFO[mode];
@@ -3139,7 +3251,7 @@ $('#settings-import-file').addEventListener('change', e => {
         DATA = imported;
         for (const room of DATA.rooms) { if (!room.tasks) room.tasks = []; }
         applyTheme();
-        save(); renderTable(); renderUsers(); renderSettingsUsers(); renderHistory();
+        save(); renderTable(); renderUsers(); renderUserDialogList(); renderHistory();
         $('#settings-dialog').close();
       } else { alert('Invalid backup file.'); }
     } catch { alert('Could not parse file.'); }
@@ -3165,7 +3277,7 @@ $('#settings-reset').addEventListener('click', () => {
     DATA = defaultData();
     drillDown = null; drillDownOrder = null; viewMode = 'room';
     applyTheme();
-    save(); renderTable(); renderUsers(); renderSettingsUsers(); renderHistory(); updateViewToggle();
+    save(); renderTable(); renderUsers(); renderUserDialogList(); renderHistory(); updateViewToggle();
     $('#settings-dialog').close();
   }
 });
@@ -3185,20 +3297,22 @@ $('#user-list').addEventListener('click', e => {
     save(); renderUsers();
   }
 });
-function renderSettingsUsers() {
-  const list = $('#settings-user-list');
+function renderUserDialogList() {
+  const list = $('#users-dialog-list');
   list.innerHTML = DATA.users.map(u =>
     `<span class="user-chip" data-user="${esc(u)}">${esc(u)}<span class="remove-user" data-remove="${esc(u)}">✕</span></span>`
   ).join('');
 }
-$('#settings-user-list').addEventListener('click', e => {
+$('#user-manage-btn').addEventListener('click', () => { renderUserDialogList(); $('#users-dialog').showModal(); });
+$('#users-close').addEventListener('click', () => $('#users-dialog').close());
+$('#users-dialog-list').addEventListener('click', e => {
   const remove = e.target.closest('.remove-user');
   if (remove) {
     const name = remove.dataset.remove;
     if (confirm(`Remove user "${name}"?`)) {
       DATA.users = DATA.users.filter(u => u !== name);
       if (DATA.selectedUser === name) DATA.selectedUser = null;
-      save(); renderUsers(); renderSettingsUsers();
+      save(); renderUsers(); renderUserDialogList();
     }
   }
 });
@@ -3209,7 +3323,7 @@ function addUser() {
   DATA.users.push(name);
   DATA.selectedUser = name;
   input.value = '';
-  save(); renderUsers(); renderSettingsUsers();
+  save(); renderUsers(); renderUserDialogList();
 }
 $('#btn-add-user').addEventListener('click', addUser);
 $('#new-user-input').addEventListener('keydown', e => { if (e.key === 'Enter') addUser(); });
