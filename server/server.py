@@ -112,6 +112,18 @@ def guess_mime(filepath: str) -> str:
 
 
 # ── Persistence helpers ───────────────────────────────────────
+MAX_CHANGELOG_ENTRIES = 200
+changelog_file: str = ""  # set in __main__ based on data_file
+
+
+def _ensure_changelog_file():
+    """Derive changelog_file from data_file if not yet set."""
+    global changelog_file
+    if not changelog_file:
+        base, ext = os.path.splitext(data_file)
+        changelog_file = f"{base}-changelog{ext}"
+
+
 def read_data() -> str:
     """Return the raw JSON string from disk (or '{}' if missing)."""
     try:
@@ -124,12 +136,132 @@ def read_data() -> str:
         return "{}"
 
 
-def write_data(body: str) -> int:
-    """Atomically write JSON to disk, stamping a _version field. Returns the new version."""
+def read_data_obj() -> dict:
+    """Return the parsed JSON object from disk."""
+    raw = read_data()
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+
+
+def _read_changelog() -> list:
+    _ensure_changelog_file()
+    if os.path.exists(changelog_file):
+        try:
+            with open(changelog_file, "r") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            pass
+    return []
+
+
+def _write_changelog(entries: list):
+    _ensure_changelog_file()
+    with open(changelog_file, "w") as f:
+        json.dump(entries[-MAX_CHANGELOG_ENTRIES:], f)
+
+
+def _compute_entries_diff(old_entries: dict, new_entries: dict) -> list:
+    """Compute a list of changes between two entries dicts.
+
+    Returns a list of {date, room, task, action, user} dicts describing
+    what changed (added, removed, or changed user).
+    """
+    changes = []
+    all_dates = set(list(old_entries.keys()) + list(new_entries.keys()))
+    for date in sorted(all_dates):
+        old_rooms = old_entries.get(date, {})
+        new_rooms = new_entries.get(date, {})
+        all_rooms = set(list(old_rooms.keys()) + list(new_rooms.keys()))
+        for room_id in all_rooms:
+            old_tasks = old_rooms.get(room_id, {}).get("tasks", {})
+            new_tasks = new_rooms.get(room_id, {}).get("tasks", {})
+            all_tasks = set(list(old_tasks.keys()) + list(new_tasks.keys()))
+            for task_id in all_tasks:
+                old_t = old_tasks.get(task_id)
+                new_t = new_tasks.get(task_id)
+                if old_t is None and new_t is not None:
+                    changes.append({
+                        "date": date, "room": room_id, "task": task_id,
+                        "type": "checked", "user": new_t.get("user", "?"),
+                    })
+                elif old_t is not None and new_t is None:
+                    changes.append({
+                        "date": date, "room": room_id, "task": task_id,
+                        "type": "unchecked", "user": old_t.get("user", "?"),
+                    })
+                elif old_t and new_t:
+                    if old_t.get("cleaned") != new_t.get("cleaned"):
+                        act = "checked" if new_t.get("cleaned") else "unchecked"
+                        changes.append({
+                            "date": date, "room": room_id, "task": task_id,
+                            "type": act, "user": new_t.get("user", "?"),
+                        })
+                    elif old_t.get("user") != new_t.get("user"):
+                        changes.append({
+                            "date": date, "room": room_id, "task": task_id,
+                            "type": "reassigned",
+                            "from_user": old_t.get("user", "?"),
+                            "user": new_t.get("user", "?"),
+                        })
+    return changes
+
+
+def _compute_structure_diff(old_obj: dict, new_obj: dict) -> list:
+    """Detect room/task/user/settings additions and removals."""
+    changes = []
+    old_rooms = {r.get("id", r.get("name", "?")): r.get("name", "?") for r in old_obj.get("rooms", [])}
+    new_rooms = {r.get("id", r.get("name", "?")): r.get("name", "?") for r in new_obj.get("rooms", [])}
+    for rid in set(new_rooms) - set(old_rooms):
+        changes.append({"type": "room_added", "name": new_rooms[rid]})
+    for rid in set(old_rooms) - set(new_rooms):
+        changes.append({"type": "room_removed", "name": old_rooms[rid]})
+
+    old_users = {(u["id"] if isinstance(u, dict) else u) for u in old_obj.get("users", [])}
+    new_users = {(u["id"] if isinstance(u, dict) else u) for u in new_obj.get("users", [])}
+    _user_name = lambda uid: next((u.get("name", uid) if isinstance(u, dict) else u
+                                   for u in new_obj.get("users", []) + old_obj.get("users", [])
+                                   if (u.get("id") if isinstance(u, dict) else u) == uid), uid)
+    for u in new_users - old_users:
+        changes.append({"type": "user_added", "name": _user_name(u)})
+    for u in old_users - new_users:
+        changes.append({"type": "user_removed", "name": _user_name(u)})
+    return changes
+
+
+class VersionConflict(Exception):
+    """Raised when a client's base_version doesn't match the server's current version."""
+    def __init__(self, server_version: int, server_data: dict):
+        self.server_version = server_version
+        self.server_data = server_data
+
+
+def write_data(body: str, client_id: str = "", client_label: str = "",
+               base_version: int = None) -> int:
+    """Atomically write JSON to disk, stamping a _version field. Returns the new version.
+
+    If base_version is provided and doesn't match the current server version,
+    raises VersionConflict so the caller can return 409.
+    """
     try:
         obj = json.loads(body)
     except json.JSONDecodeError:
         raise ValueError("Invalid JSON")
+
+    current = read_data_obj()
+    current_version = current.get("_version", 0)
+
+    # Version guard: reject stale writes
+    if base_version is not None and current_version != 0 and base_version != current_version:
+        raise VersionConflict(current_version, current)
+
+    # Compute diff for changelog
+    entry_changes = _compute_entries_diff(
+        current.get("entries", {}), obj.get("entries", {})
+    )
+    struct_changes = _compute_structure_diff(current, obj)
+
     obj["_version"] = int(time.time() * 1000)
     # Write to a temp file then atomically rename to avoid corruption
     dir_name = os.path.dirname(os.path.abspath(data_file)) or "."
@@ -145,6 +277,21 @@ def write_data(body: str) -> int:
         except OSError:
             pass
         raise
+
+    # Record changelog entry (only if something actually changed)
+    if entry_changes or struct_changes:
+        cl = _read_changelog()
+        cl.append({
+            "ts": obj["_version"],
+            "client_id": client_id,
+            "client_label": client_label,
+            "base_version": base_version or current_version,
+            "new_version": obj["_version"],
+            "entry_changes": entry_changes,
+            "struct_changes": struct_changes,
+        })
+        _write_changelog(cl)
+
     return obj["_version"]
 
 
@@ -165,8 +312,8 @@ async def broadcast(version: int, sender=None):
 # ── HTTP Server (REST API) ────────────────────────────────────
 CORS_HEADERS = (
     ("Access-Control-Allow-Origin", "*"),
-    ("Access-Control-Allow-Methods", "GET, PUT, OPTIONS"),
-    ("Access-Control-Allow-Headers", "Content-Type"),
+    ("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS"),
+    ("Access-Control-Allow-Headers", "Content-Type, X-Client-Id, X-Client-Label, X-Base-Version"),
 )
 
 
@@ -224,7 +371,7 @@ class RESTProtocol(asyncio.Protocol):
             return
 
         # Route — schedule and log any unexpected errors
-        task = asyncio.ensure_future(self._handle(method, path, body))
+        task = asyncio.ensure_future(self._handle(method, path, body, headers))
         task.add_done_callback(self._handle_task_error)
 
     @staticmethod
@@ -236,7 +383,7 @@ class RESTProtocol(asyncio.Protocol):
         if exc is not None:
             log.exception("Unhandled error in request handler", exc_info=exc)
 
-    async def _handle(self, method, path, body):
+    async def _handle(self, method, path, body, headers):
         if method == "OPTIONS":
             self._respond(204, "", extra_headers=CORS_HEADERS)
             return
@@ -254,8 +401,25 @@ class RESTProtocol(asyncio.Protocol):
                 self._respond(200, data, content_type="application/json", extra_headers=CORS_HEADERS)
                 return
             if method == "PUT":
+                client_id = headers.get("x-client-id", "")
+                client_label = headers.get("x-client-label", "")
+                base_version_str = headers.get("x-base-version", "")
+                base_version = int(base_version_str) if base_version_str else None
                 try:
-                    version = write_data(body.decode("utf-8"))
+                    version = write_data(
+                        body.decode("utf-8"),
+                        client_id=client_id,
+                        client_label=client_label,
+                        base_version=base_version,
+                    )
+                except VersionConflict as exc:
+                    resp_body = json.dumps({
+                        "error": "version_conflict",
+                        "server_version": exc.server_version,
+                        "server_data": exc.server_data,
+                    })
+                    self._respond(409, resp_body, content_type="application/json", extra_headers=CORS_HEADERS)
+                    return
                 except ValueError as exc:
                     self._respond(400, str(exc), extra_headers=CORS_HEADERS)
                     return
@@ -263,6 +427,72 @@ class RESTProtocol(asyncio.Protocol):
                 resp_body = json.dumps({"version": version})
                 self._respond(200, resp_body, content_type="application/json", extra_headers=CORS_HEADERS)
                 return
+
+        # ── Changelog endpoints ─────────────────────────────────
+        if path == "/changelog":
+            if method == "GET":
+                cl = _read_changelog()
+                self._respond(200, json.dumps(cl), content_type="application/json", extra_headers=CORS_HEADERS)
+                return
+
+        if path == "/changelog/rollback" and method == "POST":
+            try:
+                req = json.loads(body.decode("utf-8"))
+                target_ts = int(req["ts"])
+                client_id = headers.get("x-client-id", "")
+                client_label = headers.get("x-client-label", "")
+            except (json.JSONDecodeError, KeyError, ValueError):
+                self._respond(400, "Invalid rollback request", extra_headers=CORS_HEADERS)
+                return
+            cl = _read_changelog()
+            target_entry = None
+            for entry in cl:
+                if entry["ts"] == target_ts:
+                    target_entry = entry
+                    break
+            if not target_entry:
+                self._respond(404, "Changelog entry not found", extra_headers=CORS_HEADERS)
+                return
+            current = read_data_obj()
+            entries = current.get("entries", {})
+            for ch in target_entry.get("entry_changes", []):
+                date, room, task = ch["date"], ch["room"], ch["task"]
+                if ch["type"] == "checked":
+                    if date in entries and room in entries[date]:
+                        tasks = entries[date][room].get("tasks", {})
+                        tasks.pop(task, None)
+                        if not tasks:
+                            del entries[date][room]
+                        if not entries[date]:
+                            del entries[date]
+                elif ch["type"] == "unchecked":
+                    entries.setdefault(date, {}).setdefault(room, {"tasks": {}})
+                    entries[date][room]["tasks"][task] = {"cleaned": True, "user": ch.get("user", "?")}
+            current["entries"] = entries
+            version = write_data(
+                json.dumps(current),
+                client_id=client_id,
+                client_label=f"rollback by {client_label or client_id}",
+            )
+            await broadcast(version)
+            self._respond(200, json.dumps({"version": version}), content_type="application/json", extra_headers=CORS_HEADERS)
+            return
+
+        if path.startswith("/changelog/") and method == "DELETE":
+            ts_str = path.split("/")[-1]
+            try:
+                target_ts = int(ts_str)
+            except ValueError:
+                self._respond(400, "Invalid timestamp", extra_headers=CORS_HEADERS)
+                return
+            cl = _read_changelog()
+            new_cl = [e for e in cl if e["ts"] != target_ts]
+            if len(new_cl) == len(cl):
+                self._respond(404, "Changelog entry not found", extra_headers=CORS_HEADERS)
+                return
+            _write_changelog(new_cl)
+            self._respond(200, json.dumps({"ok": True}), content_type="application/json", extra_headers=CORS_HEADERS)
+            return
 
         # ── Static file fallback ────────────────────────────────
         if method == "GET" and static_root:
@@ -286,7 +516,7 @@ class RESTProtocol(asyncio.Protocol):
     def _respond(self, status, body, content_type="text/plain", extra_headers=()):
         if isinstance(body, str):
             body = body.encode("utf-8")
-        reason = {200: "OK", 204: "No Content", 400: "Bad Request", 404: "Not Found", 413: "Payload Too Large"}.get(status, "OK")
+        reason = {200: "OK", 204: "No Content", 400: "Bad Request", 404: "Not Found", 409: "Conflict", 413: "Payload Too Large"}.get(status, "OK")
         lines = [f"HTTP/1.1 {status} {reason}"]
         lines.append(f"Content-Type: {content_type}")
         lines.append(f"Content-Length: {len(body)}")
@@ -311,7 +541,25 @@ async def ws_handler(websocket, path=None):
             try:
                 msg = json.loads(message)
                 if msg.get("action") == "put" and "data" in msg:
-                    version = write_data(json.dumps(msg["data"]))
+                    client_id = msg.get("client_id", "")
+                    client_label = msg.get("client_label", "")
+                    base_version = msg.get("base_version")
+                    if base_version is not None:
+                        base_version = int(base_version)
+                    try:
+                        version = write_data(
+                            json.dumps(msg["data"]),
+                            client_id=client_id,
+                            client_label=client_label,
+                            base_version=base_version,
+                        )
+                    except VersionConflict as exc:
+                        await websocket.send(json.dumps({
+                            "type": "version_conflict",
+                            "server_version": exc.server_version,
+                            "server_data": exc.server_data,
+                        }))
+                        continue
                     await broadcast(version, sender=websocket)
                     await websocket.send(
                         json.dumps({"type": "ack", "version": version})
@@ -342,6 +590,7 @@ async def main(port: int):
     log.info("  REST:      http://0.0.0.0:%d/data", port)
     log.info("  WebSocket: ws://0.0.0.0:%d", ws_port)
     log.info("  Data file: %s", os.path.abspath(data_file))
+    log.info("  Changelog: %s", os.path.abspath(changelog_file))
     if static_root:
         log.info("  Static:    http://0.0.0.0:%d/  → %s", port, os.path.abspath(static_root))
     await asyncio.Future()  # run forever
@@ -362,6 +611,10 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     data_file = args.data
+
+    # Derive changelog file path from data file
+    base, ext = os.path.splitext(data_file)
+    changelog_file = f"{base}-changelog{ext}"
 
     # Auto-detect static root: parent of the directory containing this script
     if args.static is None:

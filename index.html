@@ -285,7 +285,37 @@ dialog input, dialog textarea, dialog select {
   padding: 6px 10px; border-radius: 6px; font-size: .85rem;
 }
 dialog textarea { resize: vertical; min-height: 40px; }
-dialog .dialog-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+dialog .dialog-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; flex-wrap: wrap; }
+
+/* ── Changelog dialog ──────────────────────────────────────── */
+#changelog-dialog { max-width: 900px; width: 95vw; }
+.cl-toolbar { display: flex; align-items: center; gap: 8px; font-size: .72rem; color: var(--desc-text); margin-bottom: 8px; }
+.cl-toolbar button {
+  font-size: .72rem; padding: 2px 8px; cursor: pointer; border-radius: 4px;
+  background: transparent; color: var(--desc-text); border: 1px solid var(--bar-border);
+}
+#changelog-table-wrap { max-height: 50vh; overflow-y: auto; }
+#changelog-table { width: 100%; border-collapse: collapse; font-size: .75rem; }
+#changelog-table th {
+  text-align: left; padding: 4px 6px; border-bottom: 2px solid var(--bar-border);
+  font-weight: 600; white-space: nowrap; position: sticky; top: 0; background: var(--bg);
+}
+#changelog-table td { padding: 3px 6px; border-bottom: 1px solid var(--bar-border); vertical-align: middle; }
+#changelog-table .cl-col-detail { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#changelog-table .cl-col-when { white-space: nowrap; }
+#changelog-table .cl-col-date { white-space: nowrap; }
+#changelog-table .cl-col-action { white-space: nowrap; }
+#changelog-table .cl-col-btns { white-space: nowrap; text-align: right; }
+#changelog-table .cl-col-btns button {
+  font-size: .65rem; padding: 1px 6px; cursor: pointer; border-radius: 3px; margin-left: 2px;
+}
+.cl-btn-rollback { background: #e67e22; color: #fff; border: none; }
+.cl-btn-prune { background: transparent; color: var(--desc-text); border: 1px solid var(--bar-border); }
+.cl-checked { color: #2ecc71; }
+.cl-unchecked { color: #e74c3c; }
+.cl-reassigned { color: #f1c40f; }
+.cl-struct-add { color: #2ecc71; }
+.cl-struct-rm { color: #e74c3c; }
 
 /* ── Tooltip (cell info) ───────────────────────────────────── */
 #cell-tooltip {
@@ -297,7 +327,7 @@ dialog .dialog-actions { display: flex; gap: 8px; margin-top: 16px; justify-cont
 /* ── Sync status indicator ──────────────────────────────────── */
 #sync-status {
   display: flex; flex-shrink: 0; align-items: center; gap: 4px;
-  font-size: .65rem; color: var(--desc-text); white-space: nowrap; cursor: default;
+  font-size: .65rem; color: var(--desc-text); white-space: nowrap; cursor: pointer;
 }
 #sync-dot {
   width: 8px; height: 8px; border-radius: 50%;
@@ -308,6 +338,15 @@ dialog .dialog-actions { display: flex; gap: 8px; margin-top: 16px; justify-cont
 #sync-dot.syncing      { background: #f1c40f; }
 #sync-dot.local        { background: #888; }
 #sync-dot.demo         { background: #9b59b6; }
+
+/* ── Connection status dialog ──────────────────────────────── */
+#conn-status-dialog { max-width: 400px; width: 90vw; }
+#conn-status-table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+#conn-status-table td { padding: 5px 8px; border-bottom: 1px solid var(--bar-border); vertical-align: top; }
+#conn-status-table .cs-label { font-weight: 600; white-space: nowrap; width: 110px; color: var(--head-text); }
+#conn-status-table .cs-ok   { color: #2ecc71; }
+#conn-status-table .cs-warn { color: #f1c40f; }
+#conn-status-table .cs-err  { color: #e74c3c; }
 
 /* ── Responsive tweaks for smaller tablets ─────────────────── */
 @media (max-width: 900px) {
@@ -449,13 +488,13 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
   max-width: 1200px; width: 94vw; max-height: 92vh;
   padding: 20px 28px; top: 2vh;
 }
-.review-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-.review-header h3 { margin: 0; font-size: 1.1rem; }
-.review-close-btn {
+.dialog-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.dialog-header h3 { margin: 0; font-size: 1.1rem; }
+.dialog-close-btn {
   background: none; border: none; color: var(--text); font-size: 1.3rem;
-  cursor: pointer; padding: 4px 10px; border-radius: 6px; line-height: 1;
+  cursor: pointer; padding: 4px 10px; border-radius: 6px; line-height: 1; min-height: 0;
 }
-.review-close-btn:hover { background: var(--btn-hover); }
+.dialog-close-btn:hover { background: var(--btn-hover); }
 
 /* Hero stats */
 .hero-stats {
@@ -726,6 +765,7 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
 
     <div class="actions">
       <button id="btn-review">📊 Review</button>
+      <button id="btn-changelog" title="Sync Changelog">📜</button>
       <button id="btn-add-room">✏ Rooms</button>
       <button id="btn-settings">⚙</button>
     </div>
@@ -754,27 +794,31 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
 
 <!-- Review dialog -->
 <dialog id="review-dialog">
-  <div class="review-header">
+  <div class="dialog-header">
     <h3>📊 Review</h3>
-    <button id="review-close" class="review-close-btn">✕</button>
+    <button id="review-close" class="dialog-close-btn">✕</button>
   </div>
   <div id="review-content"></div>
 </dialog>
 
 <!-- Room Manager dialog -->
 <dialog id="room-manager-dialog">
-  <h3>Manage Rooms</h3>
+  <div class="dialog-header">
+    <h3>Manage Rooms</h3>
+    <button id="rm-close" class="dialog-close-btn">✕</button>
+  </div>
   <div id="room-manager-list"></div>
   <div class="dialog-actions">
     <button id="rm-add-room" class="primary">+ New Room</button>
-    <span style="flex:1"></span>
-    <button id="rm-close">Close</button>
   </div>
 </dialog>
 
 <!-- Room dialog -->
 <dialog id="room-dialog">
-  <h3 id="room-dialog-title">Add Room</h3>
+  <div class="dialog-header">
+    <h3 id="room-dialog-title">Add Room</h3>
+    <button id="room-close-x" class="dialog-close-btn">✕</button>
+  </div>
   <label for="room-name">Room Name</label>
   <input id="room-name" placeholder="e.g. Kitchen" maxlength="30">
   <label for="room-desc">Description</label>
@@ -796,14 +840,59 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
   <div class="dialog-actions">
     <button id="room-delete" class="danger" style="display:none">Delete</button>
     <span style="flex:1"></span>
-    <button id="room-cancel">Cancel</button>
     <button id="room-save" class="primary">Save</button>
+  </div>
+</dialog>
+
+<!-- Changelog dialog -->
+<dialog id="changelog-dialog">
+  <div class="dialog-header">
+    <h3>📜 Sync Changelog</h3>
+    <button id="changelog-close" class="dialog-close-btn">✕</button>
+  </div>
+  <div class="cl-toolbar">
+    <button id="changelog-refresh">↻ Refresh</button>
+    <span id="changelog-age"></span>
+  </div>
+  <div id="changelog-empty" style="font-size:.82rem;color:var(--desc-text);display:none">No changes recorded yet.</div>
+  <div id="changelog-table-wrap">
+    <table id="changelog-table">
+      <thead><tr><th>When</th><th>Client</th><th>Action</th><th>Chore Date</th><th>Room / Task</th><th>User</th><th></th></tr></thead>
+      <tbody id="changelog-body"></tbody>
+    </table>
+  </div>
+</dialog>
+
+<!-- Connection status dialog -->
+<dialog id="conn-status-dialog">
+  <div class="dialog-header">
+    <h3>Connection Status</h3>
+    <button id="conn-status-close" class="dialog-close-btn">✕</button>
+  </div>
+  <div id="conn-status-body">
+    <table id="conn-status-table">
+      <tbody>
+        <tr><td class="cs-label">Mode</td><td id="cs-mode">—</td></tr>
+        <tr class="cs-server-row"><td class="cs-label">Server URL</td><td id="cs-url">—</td></tr>
+        <tr class="cs-server-row"><td class="cs-label">Server version</td><td id="cs-server-ver">—</td></tr>
+        <tr><td class="cs-label">Data version</td><td id="cs-data-ver">—</td></tr>
+        <tr class="cs-server-row"><td class="cs-label">WebSocket</td><td id="cs-ws">—</td></tr>
+        <tr class="cs-server-row"><td class="cs-label">Last sync</td><td id="cs-last-sync">—</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+    <button id="conn-test-btn" class="primary" style="font-size:.78rem;padding:4px 14px">🔍 Test Connection</button>
+    <span id="conn-test-result" style="font-size:.72rem;color:var(--desc-text)"></span>
   </div>
 </dialog>
 
 <!-- Settings dialog -->
 <dialog id="settings-dialog">
-  <h3>Settings</h3>
+  <div class="dialog-header">
+    <h3>⚙ Settings</h3>
+    <button id="settings-close-x" class="dialog-close-btn">✕</button>
+  </div>
   <label style="margin-bottom:2px">Days shown in table</label>
   <div style="display:flex;gap:10px;align-items:center">
     <div style="flex:1">
@@ -838,13 +927,12 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
     <input id="new-user-input" placeholder="Add user…" maxlength="20">
     <button id="btn-add-user">+</button>
   </div>
-  <div class="dialog-actions">
-    <button id="settings-export">Export JSON</button>
-    <button id="settings-import">Import JSON</button>
+  <div class="dialog-actions" style="flex-wrap:wrap">
+    <button id="settings-export" style="font-size:.72rem;padding:6px 10px">Export JSON</button>
+    <button id="settings-import" style="font-size:.72rem;padding:6px 10px">Import JSON</button>
     <input type="file" id="settings-import-file" accept=".json" style="display:none">
-    <button id="settings-reset" class="danger">Reset All</button>
-    <span style="flex:1"></span>
-    <button id="settings-close">Close</button>
+    <button id="settings-reset" class="danger" style="font-size:.72rem;padding:6px 10px">Reset All</button>
+    <span style="flex:1;min-width:0"></span>
     <button id="settings-save" class="primary">Save</button>
   </div>
   <div id="settings-version" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;font-size:.62rem;color:var(--desc-text);margin-top:6px;font-family:monospace">
@@ -925,6 +1013,18 @@ let _syncPending = false;
 let _syncDirty = false;
 let _syncReady = false;  // true after first successful pull; prevents pushing stale/default data
 let _ws = null;
+let _lastSyncTime = null;
+
+// ── Client Identity (persistent per device) ──────────────────
+const CLIENT_ID_KEY = 'chore-tracker-client-id';
+function getClientId() {
+  let id = localStorage.getItem(CLIENT_ID_KEY);
+  if (!id) { id = uid(); localStorage.setItem(CLIENT_ID_KEY, id); }
+  return id;
+}
+function getClientLabel() {
+  return localStorage.getItem('chore-tracker-client-label') || navigator.userAgent.replace(/^.*?(Chrome|Firefox|Safari|Edge|Opera)[\/\s]?([\d.]+).*$/, '$1 $2');
+}
 
 function migrateData() {
   if (!DATA || !DATA.rooms) DATA = defaultData();
@@ -1031,10 +1131,33 @@ async function syncPull() {
       if (localSelectedUser) DATA.selectedUser = localSelectedUser;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA));
     }
+    _lastSyncTime = Date.now();
     setSyncStatus('connected', 'Synced');
   } catch (e) {
     setSyncStatus('disconnected', 'Offline');
   }
+}
+
+// ── Entry-level merge: "cleaned: true" always wins ─────────────
+function mergeEntries(local, remote) {
+  const merged = JSON.parse(JSON.stringify(remote));
+  for (const [date, rooms] of Object.entries(local)) {
+    if (!merged[date]) { merged[date] = rooms; continue; }
+    for (const [roomId, roomData] of Object.entries(rooms)) {
+      if (!merged[date][roomId]) { merged[date][roomId] = roomData; continue; }
+      const localTasks = roomData.tasks || {};
+      const remoteTasks = merged[date][roomId].tasks || {};
+      for (const [taskId, tv] of Object.entries(localTasks)) {
+        if (!remoteTasks[taskId]) {
+          remoteTasks[taskId] = tv;
+        } else if (tv.cleaned && !remoteTasks[taskId].cleaned) {
+          remoteTasks[taskId] = tv;  // checked wins over unchecked
+        }
+      }
+      merged[date][roomId].tasks = remoteTasks;
+    }
+  }
+  return merged;
 }
 
 function syncPush() {
@@ -1049,7 +1172,12 @@ function syncPush() {
   delete payload.selectedUser;  // per-device preference
   fetch(url + '/data', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Client-Id': getClientId(),
+      'X-Client-Label': getClientLabel(),
+      'X-Base-Version': String(DATA._version || 0),
+    },
     body: JSON.stringify(payload),
   }).then(res => {
     _syncPending = false;
@@ -1057,9 +1185,21 @@ function syncPush() {
       return res.json().then(data => {
         // Update local version so we ignore our own WS broadcast
         if (data && data.version) DATA._version = data.version;
+        _lastSyncTime = Date.now();
         setSyncStatus('connected', 'Synced');
         // If changes accumulated during this push, push again
         if (_syncDirty) syncPush();
+      });
+    } else if (res.status === 409) {
+      // Version conflict — merge and retry
+      return res.json().then(async serverData => {
+        DATA.entries = mergeEntries(DATA.entries || {}, serverData.entries || {});
+        DATA._version = serverData._version;
+        DATA.rooms = serverData.rooms; DATA.users = serverData.users;
+        if (serverData.settings) Object.assign(DATA.settings, serverData.settings);
+        saveData();
+        renderTable(); renderUsers(); renderHistory();
+        syncPush();  // retry with merged data
       });
     } else {
       setSyncStatus('disconnected', 'Sync error');
@@ -1067,6 +1207,7 @@ function syncPush() {
     }
   }).catch(() => {
     _syncPending = false;
+    _syncDirty = true;  // retry when back online
     setSyncStatus('disconnected', 'Offline');
   });
 }
@@ -1085,6 +1226,8 @@ function connectWebSocket() {
     ws.onopen = () => {
       _ws = ws;
       setSyncStatus('connected', 'Live');
+      // Retry any changes that failed while offline
+      if (_syncDirty && !_syncPending) syncPush();
     };
     ws.onmessage = async (evt) => {
       try {
@@ -2683,6 +2826,187 @@ $('#new-task-label').addEventListener('input', () => {
 $('#btn-add-room').addEventListener('click', () => openRoomManager());
 $('#btn-review').addEventListener('click', () => { renderReview(); $('#review-dialog').showModal(); });
 $('#review-close').addEventListener('click', () => $('#review-dialog').close());
+
+// ── Changelog dialog ────────────────────────────────────────
+$('#btn-changelog').addEventListener('click', () => { fetchAndRenderChangelog(); $('#changelog-dialog').showModal(); });
+
+// ── Connection status dialog ────────────────────────────────
+$('#sync-status').addEventListener('click', () => { populateConnStatus(); $('#conn-status-dialog').showModal(); });
+$('#conn-status-close').addEventListener('click', () => $('#conn-status-dialog').close());
+
+function populateConnStatus() {
+  const mode = getMode();
+  const info = MODE_INFO[mode];
+  const url = getApiUrl();
+  const hasServer = mode === 'synced' || (mode === 'demo' && url);
+  $('#cs-mode').innerHTML = `${info.icon} <strong>${info.label}</strong> — ${info.desc}`;
+  $('#cs-url').textContent = url || '(none — local file)';
+  // Hide server-only rows in local mode
+  const serverRows = $$('.cs-server-row');
+  serverRows.forEach(r => r.style.display = hasServer ? '' : 'none');
+  $('#cs-data-ver').textContent = DATA._version != null ? DATA._version : (hasServer ? '(not yet synced)' : '(local only)');
+  if (hasServer) {
+    $('#cs-ws').innerHTML = _ws && _ws.readyState === WebSocket.OPEN
+      ? '<span class="cs-ok">● Connected</span>'
+      : '<span class="cs-warn">● Disconnected</span> <span style="font-size:.68rem;color:var(--desc-text)">(reconnects automatically)</span>';
+    $('#cs-last-sync').textContent = _lastSyncTime ? new Date(_lastSyncTime).toLocaleTimeString() : '(not yet)';
+    // Fetch server version live
+    const verEl = $('#cs-server-ver');
+    verEl.textContent = 'checking…';
+    fetch(url + '/version', { cache: 'no-store' }).then(r => r.json()).then(d => {
+      verEl.innerHTML = '<span class="cs-ok">' + esc(d.version || 'unknown') + '</span>';
+    }).catch(() => {
+      verEl.innerHTML = '<span class="cs-err">unreachable</span>';
+    });
+  }
+  // Show/hide test button based on mode
+  $('#conn-test-btn').style.display = hasServer ? '' : 'none';
+  $('#conn-test-result').textContent = hasServer ? '' : 'No server to test — data is stored locally in this browser.';
+}
+
+$('#conn-test-btn').addEventListener('click', async () => {
+  const url = getApiUrl();
+  const resEl = $('#conn-test-result');
+  if (!url) { resEl.textContent = 'No server URL configured.'; return; }
+  resEl.textContent = 'Testing…';
+  const t0 = performance.now();
+  try {
+    const [verRes, dataRes] = await Promise.all([
+      fetch(url + '/version', { cache: 'no-store' }),
+      fetch(url + '/data', { cache: 'no-store' }),
+    ]);
+    const ms = Math.round(performance.now() - t0);
+    if (verRes.ok && dataRes.ok) {
+      const ver = await verRes.json();
+      const data = await dataRes.json();
+      const rooms = (data.rooms || []).length;
+      resEl.innerHTML = '<span class="cs-ok">✓ OK</span> — ' + ms + 'ms, server ' + esc(ver.version || '?') + ', ' + rooms + ' room(s)';
+      // refresh displayed values
+      $('#cs-server-ver').innerHTML = '<span class="cs-ok">' + esc(ver.version || 'unknown') + '</span>';
+      $('#cs-data-ver').textContent = data._version != null ? data._version : '?';
+    } else {
+      resEl.innerHTML = '<span class="cs-err">✗ Failed</span> — version:' + verRes.status + ' data:' + dataRes.status;
+    }
+  } catch (e) {
+    resEl.innerHTML = '<span class="cs-err">✗ Unreachable</span> — ' + esc(e.message);
+  }
+});
+$('#changelog-close').addEventListener('click', () => $('#changelog-dialog').close());
+$('#changelog-refresh').addEventListener('click', () => fetchAndRenderChangelog());
+
+function _roomName(id) { const r = DATA.rooms.find(r => r.id === id); return r ? r.name : id; }
+function _taskLabel(roomId, taskId) {
+  const r = DATA.rooms.find(r => r.id === roomId);
+  if (r) { const t = (r.tasks || []).find(t => t.id === taskId); if (t) return t.label || t.name || taskId; }
+  return taskId;
+}
+function _changeHtml(c, time, client) {
+  const tag = c.type;
+  const room = esc(_roomName(c.room));
+  const task = esc(_taskLabel(c.room, c.task));
+  const user = esc(c.user || '');
+  const choreDate = esc(c.date || '');
+  // action label + css class
+  let action, cls;
+  if (tag === 'checked')        { action = '✓ Checked'; cls = 'cl-checked'; }
+  else if (tag === 'unchecked') { action = '✗ Cleared'; cls = 'cl-unchecked'; }
+  else if (tag === 'reassigned'){ action = '↻ Reassigned'; cls = 'cl-reassigned'; }
+  else if (tag === 'room_added')  { action = '+ Room'; cls = 'cl-struct-add'; }
+  else if (tag === 'room_removed'){ action = '− Room'; cls = 'cl-struct-rm'; }
+  else if (tag === 'user_added')  { action = '+ User'; cls = 'cl-struct-add'; }
+  else if (tag === 'user_removed'){ action = '− User'; cls = 'cl-struct-rm'; }
+  else { action = tag; cls = ''; }
+  // detail column
+  let detail;
+  if (tag === 'reassigned') detail = `${room} / ${task}`;
+  else if (tag && tag.startsWith('room_')) detail = esc(c.name || c.id || '');
+  else if (tag && tag.startsWith('user_')) detail = esc(c.name || c.id || '');
+  else detail = `${room} / ${task}`;
+  // user column
+  let userCol;
+  if (tag === 'reassigned') userCol = `${esc(c.from_user||'?')} → ${esc(c.to_user||'?')}`;
+  else userCol = user;
+  return { time, client, action, cls, choreDate, detail, userCol };
+}
+
+let _changelogFetchedAt = null;
+function _updateChangelogAge() {
+  const el = $('#changelog-age');
+  if (!_changelogFetchedAt) { el.textContent = ''; return; }
+  const sec = Math.round((Date.now() - _changelogFetchedAt) / 1000);
+  if (sec < 5) el.textContent = 'just now';
+  else if (sec < 60) el.textContent = sec + 's ago';
+  else if (sec < 3600) el.textContent = Math.floor(sec / 60) + 'm ago';
+  else el.textContent = Math.floor(sec / 3600) + 'h ago';
+}
+setInterval(_updateChangelogAge, 5000);
+
+async function fetchAndRenderChangelog() {
+  const url = getApiUrl(); if (!url) return;
+  const body = $('#changelog-body'); const empty = $('#changelog-empty');
+  body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--desc-text)">Loading…</td></tr>';
+  empty.style.display = 'none';
+  try {
+    const res = await fetch(url + '/changelog');
+    if (!res.ok) throw new Error('status ' + res.status);
+    const entries = await res.json();
+    _changelogFetchedAt = Date.now();
+    _updateChangelogAge();
+    if (!entries.length) { body.innerHTML = ''; empty.style.display = ''; return; }
+    entries.sort((a, b) => b.ts - a.ts);
+    const rows = [];
+    for (const e of entries) {
+      const d = new Date(e.ts * 1000);
+      const time = d.toLocaleDateString(undefined, {month:'short',day:'numeric'}) + ' ' + d.toLocaleTimeString(undefined, {hour:'2-digit',minute:'2-digit'});
+      const client = esc(e.client_label || e.client_id || '?');
+      const changes = [...(e.entry_changes||[]), ...(e.structure_changes||[])];
+      const hasEntryChanges = (e.entry_changes||[]).length > 0;
+      for (let i = 0; i < changes.length; i++) {
+        const r = _changeHtml(changes[i], time, client);
+        const btns = i === 0
+          ? `${hasEntryChanges ? '<button class="cl-btn-rollback" data-ts="'+e.ts+'" title="Undo: reverses this change (checked → unchecked, etc.) and logs a new changelog entry">↺</button>' : ''}<button class="cl-btn-prune" data-ts="${e.ts}" title="Delete: removes this log entry only — does NOT undo the change">🗑</button>`
+          : '';
+        rows.push(`<tr>
+          <td class="cl-col-when">${i === 0 ? r.time : ''}</td>
+          <td>${i === 0 ? r.client : ''}</td>
+          <td class="cl-col-action ${r.cls}">${r.action}</td>
+          <td class="cl-col-date">${r.choreDate}</td>
+          <td class="cl-col-detail" title="${r.detail}">${r.detail}</td>
+          <td>${r.userCol}</td>
+          <td class="cl-col-btns">${btns}</td>
+        </tr>`);
+      }
+    }
+    body.innerHTML = rows.join('');
+  } catch (err) {
+    body.innerHTML = '<tr><td colspan="7" style="color:var(--desc-text)">Could not load changelog.</td></tr>';
+  }
+}
+
+$('#changelog-body').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button'); if (!btn) return;
+  const url = getApiUrl(); if (!url) return;
+  const ts = btn.dataset.ts;
+  if (btn.classList.contains('cl-btn-rollback')) {
+    if (!confirm('Undo this change?\n\nThis will reverse the data (checked → unchecked, etc.) and log a new changelog entry showing the undo.')) return;
+    try {
+      const res = await fetch(url + '/changelog/rollback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Client-Id': getClientId(), 'X-Client-Label': getClientLabel() },
+        body: JSON.stringify({ ts: Number(ts) }),
+      });
+      if (res.ok) { await syncPull(); renderTable(); renderUsers(); renderHistory(); fetchAndRenderChangelog(); }
+      else alert('Rollback failed: ' + res.status);
+    } catch { alert('Rollback request failed'); }
+  } else if (btn.classList.contains('cl-btn-prune')) {
+    if (!confirm('Delete this log entry?\n\nThis only removes the entry from the changelog. It does NOT undo the actual change. Use ↺ Undo first if you want to reverse the change.')) return;
+    try {
+      const res = await fetch(url + '/changelog/' + ts, { method: 'DELETE' });
+      if (res.ok) fetchAndRenderChangelog();
+      else alert('Prune failed: ' + res.status);
+    } catch { alert('Prune request failed'); }
+  }
+});
 $('#rm-close').addEventListener('click', () => $('#room-manager-dialog').close());
 $('#rm-add-room').addEventListener('click', () => { $('#room-manager-dialog').close(); _roomDialogFromManager = true; openRoomDialog(null); });
 $('#room-manager-list').addEventListener('click', e => {
@@ -2700,7 +3024,7 @@ function openRoomManager() {
   }).join('') || '<div style="text-align:center;color:var(--desc-text);padding:12px">No rooms yet</div>';
   $('#room-manager-dialog').showModal();
 }
-$('#room-cancel').addEventListener('click', () => { $('#room-dialog').close(); if (_roomDialogFromManager) openRoomManager(); _roomDialogFromManager = false; });
+$('#room-close-x').addEventListener('click', () => { $('#room-dialog').close(); if (_roomDialogFromManager) openRoomManager(); _roomDialogFromManager = false; });
 $('#room-save').addEventListener('click', () => {
   const name = $('#room-name').value.trim();
   if (!name) return;
@@ -2778,7 +3102,7 @@ function updateVersionDisplay() {
     verEl.textContent = 'local-only · sw: ' + (navigator.serviceWorker?.controller ? 'active' : 'none');
   }
 }
-$('#settings-close').addEventListener('click', () => $('#settings-dialog').close());
+$('#settings-close-x').addEventListener('click', () => $('#settings-dialog').close());
 $('#settings-save').addEventListener('click', async () => {
   DATA.settings.pastDays = Math.max(0, parseInt($('#settings-past-days').value) || 3);
   DATA.settings.futureDays = Math.max(1, parseInt($('#settings-future-days').value) || 10);

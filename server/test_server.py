@@ -100,6 +100,7 @@ async def server(tmp_path):
 
     # Patch module-level state
     srv.data_file = data_path
+    srv.changelog_file = str(tmp_path / "test-data-changelog.json")
     srv.static_root = static_dir
     srv.CLIENTS.clear()
 
@@ -839,3 +840,229 @@ class TestUserInteraction:
 
         await phone.close()
         await tablet.close()
+
+
+# ── Changelog / Version Guard Tests ──────────────────────────
+
+class TestVersionGuard:
+    """Tests for version conflict detection and changelog recording."""
+
+    @pytest.mark.asyncio
+    async def test_put_with_stale_version_returns_409(self, server):
+        """PUT /data with an outdated X-Base-Version returns 409 Conflict."""
+        # Initial push to establish version 1
+        payload1 = json.dumps({"rooms": [{"id": "r1", "name": "Kitchen"}], "users": []}).encode()
+        status, _, body = await _http_request(
+            server["rest_port"], "PUT", "/data",
+            body=payload1,
+            headers={"Content-Type": "application/json", "X-Client-Id": "c1", "X-Base-Version": "0"},
+        )
+        assert status == 200
+        v1 = json.loads(body)["version"]
+
+        # Second push to advance version
+        payload2 = json.dumps({"rooms": [{"id": "r1", "name": "Kitchen"}, {"id": "r2", "name": "Bath"}], "users": []}).encode()
+        status, _, body = await _http_request(
+            server["rest_port"], "PUT", "/data",
+            body=payload2,
+            headers={"Content-Type": "application/json", "X-Client-Id": "c2", "X-Base-Version": str(v1)},
+        )
+        assert status == 200
+        v2 = json.loads(body)["version"]
+        assert v2 > v1
+
+        # Third push with stale base (v1) should get 409
+        payload3 = json.dumps({"rooms": [{"id": "r1", "name": "Kitchen Updated"}], "users": []}).encode()
+        status, _, body = await _http_request(
+            server["rest_port"], "PUT", "/data",
+            body=payload3,
+            headers={"Content-Type": "application/json", "X-Client-Id": "c1", "X-Base-Version": str(v1)},
+        )
+        assert status == 409
+        conflict_data = json.loads(body)
+        assert "server_data" in conflict_data
+        assert conflict_data["server_data"]["_version"] == v2
+
+    @pytest.mark.asyncio
+    async def test_put_without_base_version_succeeds(self, server):
+        """PUT /data without X-Base-Version (legacy client) still works."""
+        payload = json.dumps({"rooms": [{"id": "r1", "name": "Kitchen"}]}).encode()
+        status, _, body = await _http_request(
+            server["rest_port"], "PUT", "/data",
+            body=payload,
+            headers={"Content-Type": "application/json"},
+        )
+        assert status == 200
+        assert "version" in json.loads(body)
+
+    @pytest.mark.asyncio
+    async def test_changelog_recorded_on_put(self, server):
+        """PUT /data records a changelog entry with diffs."""
+        # Push initial data
+        payload = json.dumps({
+            "rooms": [{"id": "r1", "name": "Kitchen", "tasks": [{"id": "t1", "name": "Wipe"}]}],
+            "users": [],
+            "entries": {},
+        }).encode()
+        status, _, body = await _http_request(
+            server["rest_port"], "PUT", "/data",
+            body=payload,
+            headers={"Content-Type": "application/json", "X-Client-Id": "device-A", "X-Client-Label": "Phone"},
+        )
+        assert status == 200
+        v1 = json.loads(body)["version"]
+
+        # Push with a checked entry
+        payload2 = json.dumps({
+            "rooms": [{"id": "r1", "name": "Kitchen", "tasks": [{"id": "t1", "name": "Wipe"}]}],
+            "users": [],
+            "entries": {"2025-01-15": {"r1": {"tasks": {"t1": {"cleaned": True, "user": "Alice"}}}}},
+        }).encode()
+        status, _, body = await _http_request(
+            server["rest_port"], "PUT", "/data",
+            body=payload2,
+            headers={
+                "Content-Type": "application/json",
+                "X-Client-Id": "device-A",
+                "X-Client-Label": "Phone",
+                "X-Base-Version": str(v1),
+            },
+        )
+        assert status == 200
+
+        # GET /changelog should have entries
+        status, _, body = await _http_request(server["rest_port"], "GET", "/changelog")
+        assert status == 200
+        cl = json.loads(body)
+        assert len(cl) >= 1
+        # Most recent entry should have our client info
+        last = cl[-1]
+        assert last["client_id"] == "device-A"
+        assert last["client_label"] == "Phone"
+        # Should have recorded the checked entry
+        checked = [c for c in last.get("entry_changes", []) if c.get("type") == "checked"]
+        assert len(checked) == 1
+        assert checked[0]["room"] == "r1"
+        assert checked[0]["task"] == "t1"
+
+    @pytest.mark.asyncio
+    async def test_get_changelog_empty(self, server):
+        """GET /changelog returns empty list when no changes recorded."""
+        status, _, body = await _http_request(server["rest_port"], "GET", "/changelog")
+        assert status == 200
+        assert json.loads(body) == []
+
+    @pytest.mark.asyncio
+    async def test_changelog_prune(self, server):
+        """DELETE /changelog/<ts> removes a specific entry."""
+        # Create some changelog data
+        payload = json.dumps({"rooms": [{"id": "r1", "name": "Kitchen"}], "users": []}).encode()
+        status, _, _ = await _http_request(
+            server["rest_port"], "PUT", "/data",
+            body=payload,
+            headers={"Content-Type": "application/json", "X-Client-Id": "c1"},
+        )
+        assert status == 200
+
+        # Get the changelog
+        status, _, body = await _http_request(server["rest_port"], "GET", "/changelog")
+        cl = json.loads(body)
+        assert len(cl) >= 1
+        ts = cl[0]["ts"]
+
+        # Delete it
+        status, _, _ = await _http_request(server["rest_port"], "DELETE", f"/changelog/{ts}")
+        assert status == 200
+
+        # Verify it's gone
+        status, _, body = await _http_request(server["rest_port"], "GET", "/changelog")
+        remaining = json.loads(body)
+        assert all(e["ts"] != ts for e in remaining)
+
+    @pytest.mark.asyncio
+    async def test_changelog_rollback(self, server):
+        """POST /changelog/rollback reverses entry-level changes."""
+        # Push initial clean state
+        payload1 = json.dumps({
+            "rooms": [{"id": "r1", "name": "Kitchen", "tasks": [{"id": "t1", "name": "Wipe"}]}],
+            "users": [],
+            "entries": {},
+        }).encode()
+        status, _, body = await _http_request(
+            server["rest_port"], "PUT", "/data",
+            body=payload1,
+            headers={"Content-Type": "application/json", "X-Client-Id": "c1"},
+        )
+        v1 = json.loads(body)["version"]
+
+        # Push a checked entry
+        payload2 = json.dumps({
+            "rooms": [{"id": "r1", "name": "Kitchen", "tasks": [{"id": "t1", "name": "Wipe"}]}],
+            "users": [],
+            "entries": {"2025-01-15": {"r1": {"tasks": {"t1": {"cleaned": True, "user": "Bob"}}}}},
+        }).encode()
+        status, _, body = await _http_request(
+            server["rest_port"], "PUT", "/data",
+            body=payload2,
+            headers={"Content-Type": "application/json", "X-Client-Id": "c1", "X-Base-Version": str(v1)},
+        )
+        assert status == 200
+        v2 = json.loads(body)["version"]
+
+        # Get changelog to find the ts of the check
+        status, _, body = await _http_request(server["rest_port"], "GET", "/changelog")
+        cl = json.loads(body)
+        check_entry = [e for e in cl if any(c.get("type") == "checked" for c in e.get("entry_changes", []))]
+        assert len(check_entry) == 1
+        ts = check_entry[0]["ts"]
+
+        # Rollback that change
+        rollback_body = json.dumps({"ts": ts}).encode()
+        status, _, body = await _http_request(
+            server["rest_port"], "POST", "/changelog/rollback",
+            body=rollback_body,
+            headers={"Content-Type": "application/json", "X-Client-Id": "c1"},
+        )
+        assert status == 200
+
+        # Verify the entry was unchecked
+        status, _, body = await _http_request(server["rest_port"], "GET", "/data")
+        data = json.loads(body)
+        task_data = data.get("entries", {}).get("2025-01-15", {}).get("r1", {}).get("tasks", {}).get("t1", {})
+        assert task_data.get("cleaned") is not True  # should be unchecked after rollback
+
+    @pytest.mark.asyncio
+    async def test_ws_version_conflict(self, server):
+        """WebSocket push with stale version sends conflict response."""
+        # Establish initial data via REST
+        payload = json.dumps({"rooms": [{"id": "r1", "name": "Kitchen"}], "users": []}).encode()
+        status, _, body = await _http_request(
+            server["rest_port"], "PUT", "/data",
+            body=payload,
+            headers={"Content-Type": "application/json", "X-Client-Id": "rest-client"},
+        )
+        v1 = json.loads(body)["version"]
+
+        # Advance version via another REST push
+        payload2 = json.dumps({"rooms": [{"id": "r1", "name": "Kitchen"}, {"id": "r2", "name": "Bath"}], "users": []}).encode()
+        status, _, body = await _http_request(
+            server["rest_port"], "PUT", "/data",
+            body=payload2,
+            headers={"Content-Type": "application/json", "X-Client-Id": "rest-client", "X-Base-Version": str(v1)},
+        )
+        v2 = json.loads(body)["version"]
+
+        # Connect WS and send with stale version
+        uri = f"ws://127.0.0.1:{server['ws_port']}"
+        async with ws_connect(uri) as ws:
+            msg = json.dumps({
+                "action": "put",
+                "data": {"rooms": [{"id": "r1", "name": "Kitchen Modified"}], "users": []},
+                "client_id": "ws-client",
+                "base_version": v1,  # stale
+            })
+            await ws.send(msg)
+            # Should receive a conflict response
+            resp = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+            assert resp.get("type") == "version_conflict"
+            assert resp["server_version"] == v2
