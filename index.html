@@ -363,6 +363,7 @@ dialog .dialog-actions { display: flex; gap: 8px; margin-top: 16px; justify-cont
   #sync-status #sync-label { display: none; }
   #sync-status { flex-shrink: 0; margin-left: auto; }
   .view-toggle button { font-size: .65rem; padding: 5px 8px; min-height: 34px; }
+  #due-filter { font-size: .65rem; padding: 3px 4px; min-height: 34px; }
   #user-section .user-chip { font-size: .68rem; padding: 2px 6px; }
 
   #chore-table tbody th {
@@ -398,6 +399,11 @@ dialog .dialog-actions { display: flex; gap: 8px; margin-top: 16px; justify-cont
 .view-toggle button:last-child { border-radius: 0 6px 6px 0; border-right-width: 1px; }
 .view-toggle button.active {
   background: var(--accent); border-color: var(--accent); color: #fff;
+}
+#due-filter {
+  font-size: .72rem; padding: 4px 6px; border-radius: 6px;
+  background: var(--input-bg); color: var(--text); border: 1px solid var(--input-border);
+  flex-shrink: 0; cursor: pointer;
 }
 
 /* ── Back Bar ──────────────────────────────────────────────── */
@@ -737,7 +743,15 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
     <div class="view-toggle">
       <button id="btn-view-room" class="active">🏠 Rooms</button>
       <button id="btn-view-task">📋 Tasks</button>
+      <button id="btn-view-flat">📝 Ungrouped</button>
     </div>
+    <select id="due-filter" title="Filter tasks by urgency">
+      <option value="Infinity">Show: All tasks</option>
+      <option value="7">Show: Due within 7 days</option>
+      <option value="3">Show: Due within 3 days</option>
+      <option value="0">Show: Due today</option>
+      <option value="-1">Show: Overdue only</option>
+    </select>
 
     <div class="tb-sep"></div>
 
@@ -1272,10 +1286,12 @@ async function syncInit() {
 }
 
 // ── View State ───────────────────────────────────────────────
-let viewMode = 'room';      // 'room' | 'tasktype'
+let viewMode = 'room';      // 'room' | 'tasktype' | 'flat'
 let drillDown = null;        // null | { type:'room', roomId } | { type:'tasktype', taskLabel }
 let drillDownOrder = null;   // cached sort order for drill-down (prevents re-sort on toggle)
+let flatViewOrder = null;    // cached sort order for flat view (prevents re-sort on cell toggle)
 let dateOffset = 0;          // shift visible date window (negative = past, positive = future)
+let dueFilter = Infinity;    // max days-until-due to show (Infinity = all, 7, 3, 0, -1)
 
 // ── Task Helpers ─────────────────────────────────────────────
 function roomHasTasks(room) { return room.tasks && room.tasks.length > 0; }
@@ -1688,6 +1704,20 @@ function sortedRoomsForTask(taskLabel) {
     const db = b.task.cleanDays - (taskCellInfo(b.room, b.task, today()).daysSince ?? 0);
     return da - db;
   });
+}
+
+// ── Due-Date Filter ──────────────────────────────────────────
+function itemDaysUntilDue(room, task) {
+  if (task) {
+    const info = taskCellInfo(room, task, today());
+    return info.daysSince === 999 ? -999 : task.cleanDays - (info.daysSince ?? 0);
+  }
+  const info = cellInfo(room, today());
+  return info.daysSince === 999 ? -999 : room.cleanDays - (info.daysSince ?? 0);
+}
+function passesDueFilter(room, task) {
+  if (dueFilter === Infinity) return true;
+  return itemDaysUntilDue(room, task) <= dueFilter;
 }
 
 // ── Review Feature ───────────────────────────────────────────
@@ -2287,6 +2317,7 @@ function renderTable(animate) {
     }
     renderDrillDown(dates, t, prefixes);
   }
+  else if (viewMode === 'flat') renderFlatView(dates, t, prefixes);
   else if (viewMode === 'room') renderRoomView(dates, t, prefixes, animate);
   else renderTaskTypeView(dates, t, prefixes);
 
@@ -2297,7 +2328,7 @@ function renderTable(animate) {
 function renderTableHead(dates, t) {
   let headHtml = '<colgroup><col><col><col>';
   for (let i = 0; i < dates.length; i++) headHtml += '<col>';
-  headHtml += '</colgroup><tr><th colspan=3>' + (viewMode === 'tasktype' && !drillDown ? 'Task Type' : 'Room') + '</th>';
+  headHtml += '</colgroup><tr><th colspan=3>' + (viewMode === 'flat' ? 'Task' : viewMode === 'tasktype' && !drillDown ? 'Task Type' : 'Room') + '</th>';
   for (let i = 0; i < dates.length; i++) {
     const d = dates[i];
     const isFirst = i === 0;
@@ -2332,7 +2363,15 @@ function updateBackBar() {
 }
 
 function renderRoomView(dates, t, prefixes, animate) {
-  const rooms = sortedRooms();
+  let rooms = sortedRooms();
+
+  // Apply due-date filter: hide rooms where no task passes
+  if (dueFilter !== Infinity) {
+    rooms = rooms.filter(room => {
+      if (roomHasTasks(room)) return room.tasks.some(task => passesDueFilter(room, task));
+      return passesDueFilter(room, null);
+    });
+  }
 
   // FLIP animation prep
   const oldPos = {};
@@ -2372,6 +2411,13 @@ function renderRoomView(dates, t, prefixes, animate) {
     }
     html += '</tr>';
   }
+  if (rooms.length === 0 && dueFilter !== Infinity) {
+    html = '<tr><td colspan="100" style="text-align:center;padding:40px 20px;color:var(--desc-text);font-size:1.1rem;line-height:1.6">🎉<br><strong>You\&#39;re all caught up!</strong><br><span style="font-size:.8rem">No tasks match the current filter.</span></td></tr>';
+    $('#table-head').innerHTML = '';
+    $('#table-body').innerHTML = html;
+    $('#table-foot').innerHTML = '';
+    return;
+  }
   $('#table-body').innerHTML = html;
 
   // FLIP animation
@@ -2392,17 +2438,24 @@ function renderRoomView(dates, t, prefixes, animate) {
   }
 
   // Footer
+  const filteredItems = [];
   let footHtml = `<tr><th colspan=3 data-foot-tip="Tasks clean out of total\nacross all rooms">Summary</th>`;
   for (const d of dates) {
     let clean = 0, total = 0;
     for (const room of rooms) {
       if (roomHasTasks(room)) {
-        const info = roomAggCellInfo(room, d);
-        clean += info.cleaned; total += info.total;
+        for (const task of room.tasks) {
+          if (dueFilter !== Infinity && !passesDueFilter(room, task)) continue;
+          const info = taskCellInfo(room, task, d);
+          if (info.ratio < 1 || info.state === 'cleaned') clean++;
+          total++;
+          if (d === dates[0]) filteredItems.push({ room, task });
+        }
       } else {
         const s = cellInfo(room, d);
         if (s.state === 'cleaned' || s.state === 'clean') clean++;
         total++;
+        if (d === dates[0]) filteredItems.push({ room });
       }
     }
     const todayCls = d === t ? ' col-today' : '';
@@ -2412,12 +2465,20 @@ function renderRoomView(dates, t, prefixes, animate) {
     footHtml += `<td class="${todayCls}" data-foot-tip="${tip}">${clean}/${total}</td>`;
   }
   footHtml += '</tr>';
-  footHtml += progressRowHtml(allAtomicItems(), dates, t);
+  footHtml += progressRowHtml(filteredItems, dates, t);
   $('#table-foot').innerHTML = footHtml;
 }
 
 function renderTaskTypeView(dates, t, prefixes) {
-  const taskTypes = sortedTaskTypes();
+  let taskTypes = sortedTaskTypes();
+
+  // Apply due-date filter: hide task types where no room-task passes
+  if (dueFilter !== Infinity) {
+    taskTypes = taskTypes.filter(tt => {
+      const rts = getRoomsForTaskType(tt.label);
+      return rts.some(({ room, task }) => passesDueFilter(room, task));
+    });
+  }
 
   let html = '';
   for (const tt of taskTypes) {
@@ -2447,19 +2508,31 @@ function renderTaskTypeView(dates, t, prefixes) {
     html += '</tr>';
   }
 
-  if (taskTypes.length === 0) {
+  if (taskTypes.length === 0 && dueFilter !== Infinity) {
+    html = '<tr><td colspan="100" style="text-align:center;padding:40px 20px;color:var(--desc-text);font-size:1.1rem;line-height:1.6">🎉<br><strong>You\&#39;re all caught up!</strong><br><span style="font-size:.8rem">No tasks match the current filter.</span></td></tr>';
+    $('#table-head').innerHTML = '';
+    $('#table-body').innerHTML = html;
+    $('#table-foot').innerHTML = '';
+    return;
+  } else if (taskTypes.length === 0) {
     html = '<tr><td colspan="100" style="text-align:center;color:var(--desc-text);padding:20px">No task types defined. Edit a room to add tasks.</td></tr>';
   }
 
   $('#table-body').innerHTML = html;
 
   // Footer
+  const filteredItems = [];
   let footHtml = `<tr><th colspan=3 data-foot-tip="Tasks clean out of total\nacross all task types">Summary</th>`;
   for (const d of dates) {
     let clean = 0, total = 0;
     for (const tt of taskTypes) {
-      const info = taskTypeAggCellInfo(tt.label, d);
-      clean += info.cleaned; total += info.total;
+      for (const { room, task } of getRoomsForTaskType(tt.label)) {
+        if (dueFilter !== Infinity && !passesDueFilter(room, task)) continue;
+        const info = taskCellInfo(room, task, d);
+        if (info.ratio < 1 || info.state === 'cleaned') clean++;
+        total++;
+        if (d === dates[0]) filteredItems.push({ room, task });
+      }
     }
     const todayCls = d === t ? ' col-today' : '';
     const dLabel = d === t ? 'Today' : dayLabel(d);
@@ -2468,7 +2541,84 @@ function renderTaskTypeView(dates, t, prefixes) {
     footHtml += `<td class="${todayCls}" data-foot-tip="${tip}">${clean}/${total}</td>`;
   }
   footHtml += '</tr>';
-  footHtml += progressRowHtml(allAtomicItems(), dates, t);
+  footHtml += progressRowHtml(filteredItems, dates, t);
+  $('#table-foot').innerHTML = footHtml;
+}
+
+function renderFlatView(dates, t, prefixes) {
+  // Collect all atomic items; sort only on first render, then cache order
+  let items = allAtomicItems();
+  if (!flatViewOrder) {
+    items.sort((a, b) => {
+      const da = itemDaysUntilDue(a.room, a.task);
+      const db = itemDaysUntilDue(b.room, b.task);
+      return da - db;
+    });
+    flatViewOrder = items.map(it => it.task ? it.room.id + ':' + it.task.id : it.room.id);
+  } else {
+    const lookup = new Map(items.map(it => [it.task ? it.room.id + ':' + it.task.id : it.room.id, it]));
+    items = flatViewOrder.map(key => lookup.get(key)).filter(Boolean);
+  }
+
+  // Apply due-date filter
+  if (dueFilter !== Infinity) items = items.filter(it => passesDueFilter(it.room, it.task));
+
+  let html = '';
+  for (const item of items) {
+    const { room, task } = item;
+    const rowId = task ? room.id + ':' + task.id : room.id;
+    const cd = task ? task.cleanDays : room.cleanDays;
+    const taskLabel = task ? task.label : room.name;
+    const subLabel = task ? room.name : '';
+    html += `<tr data-row-id="flat-${rowId}">`;
+    html += `<th colspan=3>
+      <span class="room-name">${esc(taskLabel)}</span> <span class="room-cycle" style="display:inline;margin-left:4px">${cd}d</span>
+      ${subLabel ? '<span class="room-desc">' + esc(subLabel) + '</span>' : ''}
+    </th>`;
+    for (const d of dates) {
+      const info = task ? taskCellInfo(room, task, d) : cellInfo(room, d);
+      const user = task ? taskCleanedBy(room.id, task.id, d) : cleanedBy(room, d);
+      const isFuture = !!info.future;
+      const bg = cellColor(info.ratio, isFuture);
+      const fg = cellTextColor(info.ratio);
+      const todayCls = d === t ? ' col-today' : '';
+      let label = '';
+      if (info.state === 'cleaned') label = user ? (prefixes[user] || user.charAt(0).toUpperCase()) : '✓';
+      else if (info.daysOverdue > 0) label = `+${info.daysOverdue}`;
+      const action = isFuture ? '' : info.state === 'cleaned' ? ' data-action="undo"' : ' data-action="toggle"';
+      const taskAttr = task ? ` data-task="${task.id}"` : '';
+      html += `<td class="${todayCls}" style="background:${bg};color:${fg}" data-room="${room.id}"${taskAttr} data-date="${d}"${action}>${label}</td>`;
+    }
+    html += '</tr>';
+  }
+
+  if (items.length === 0) {
+    html = '<tr><td colspan="100" style="text-align:center;padding:40px 20px;color:var(--desc-text);font-size:1.1rem;line-height:1.6">🎉<br><strong>You\&#39;re all caught up!</strong><br><span style="font-size:.8rem">No tasks match the current filter.</span></td></tr>';
+    $('#table-head').innerHTML = '';
+    $('#table-body').innerHTML = html;
+    $('#table-foot').innerHTML = '';
+    return;
+  }
+
+  $('#table-body').innerHTML = html;
+
+  // Footer
+  let footHtml = `<tr><th colspan=3 data-foot-tip="Tasks clean out of total">Summary</th>`;
+  for (const d of dates) {
+    let clean = 0, total = 0;
+    for (const item of items) {
+      const info = item.task ? taskCellInfo(item.room, item.task, d) : cellInfo(item.room, d);
+      if (info.ratio < 1 || info.state === 'cleaned') clean++;
+      total++;
+    }
+    const todayCls = d === t ? ' col-today' : '';
+    const dLabel = d === t ? 'Today' : dayLabel(d);
+    const dirty = total - clean;
+    const tip = `${dLabel}\n${clean} of ${total} tasks clean\n${dirty} task${dirty !== 1 ? 's' : ''} need attention`;
+    footHtml += `<td class="${todayCls}" data-foot-tip="${tip}">${clean}/${total}</td>`;
+  }
+  footHtml += '</tr>';
+  footHtml += progressRowHtml(items, dates, t);
   $('#table-foot').innerHTML = footHtml;
 }
 
@@ -2494,11 +2644,12 @@ function renderDrillDown(dates, t, prefixes) {
     }
     html += '</tr>';
 
-    // Task detail rows (use cached order)
+    // Task detail rows (use cached order, apply filter)
     const allTasks = room.tasks || [];
-    const orderedTasks = drillDownOrder
+    let orderedTasks = drillDownOrder
       ? drillDownOrder.map(id => allTasks.find(t => t.id === id)).filter(Boolean)
       : sortedTasksInRoom(room);
+    if (dueFilter !== Infinity) orderedTasks = orderedTasks.filter(task => passesDueFilter(room, task));
     for (const task of orderedTasks) {
       html += `<tr data-room-id="${room.id}" data-task-id="${task.id}">
         <th colspan=3 data-tasktype="${esc(task.label)}">
@@ -2526,9 +2677,10 @@ function renderDrillDown(dates, t, prefixes) {
 
     // Room detail rows (use cached order)
     const allRoomTasks = getRoomsForTaskType(taskLabel);
-    const orderedRoomTasks = drillDownOrder
+    let orderedRoomTasks = drillDownOrder
       ? drillDownOrder.map(key => { const [rid, tid] = key.split(':'); return allRoomTasks.find(rt => rt.room.id === rid && rt.task.id === tid); }).filter(Boolean)
       : sortedRoomsForTask(taskLabel);
+    if (dueFilter !== Infinity) orderedRoomTasks = orderedRoomTasks.filter(({ room, task }) => passesDueFilter(room, task));
     if (orderedRoomTasks.length === 0) { drillDown = null; drillDownOrder = null; renderTable(); return; }
 
     // Parent aggregate row
@@ -2580,10 +2732,14 @@ function renderDrillDown(dates, t, prefixes) {
   if (drillDown.type === 'room') {
     const room = DATA.rooms.find(r => r.id === drillDown.roomId);
     if (room && roomHasTasks(room)) {
-      for (const task of room.tasks) drillItems.push({ room, task });
+      for (const task of room.tasks) {
+        if (dueFilter !== Infinity && !passesDueFilter(room, task)) continue;
+        drillItems.push({ room, task });
+      }
     }
   } else {
     for (const { room, task } of getRoomsForTaskType(drillDown.taskLabel)) {
+      if (dueFilter !== Infinity && !passesDueFilter(room, task)) continue;
       drillItems.push({ room, task });
     }
   }
@@ -2704,13 +2860,24 @@ $('#table-head').addEventListener('click', e => {
 
 $('#btn-view-room').addEventListener('click', () => {
   if (viewMode === 'room' && !drillDown) return;
-  viewMode = 'room'; drillDown = null; drillDownOrder = null;
+  viewMode = 'room'; drillDown = null; drillDownOrder = null; flatViewOrder = null;
   updateViewToggle(); renderTable();
 });
 $('#btn-view-task').addEventListener('click', () => {
   if (viewMode === 'tasktype' && !drillDown) return;
-  viewMode = 'tasktype'; drillDown = null; drillDownOrder = null;
+  viewMode = 'tasktype'; drillDown = null; drillDownOrder = null; flatViewOrder = null;
   updateViewToggle(); renderTable();
+});
+$('#btn-view-flat').addEventListener('click', () => {
+  if (viewMode === 'flat') return;
+  viewMode = 'flat'; drillDown = null; drillDownOrder = null; flatViewOrder = null;
+  updateViewToggle(); renderTable();
+});
+$('#due-filter').addEventListener('change', (e) => {
+  const v = e.target.value;
+  dueFilter = v === 'Infinity' ? Infinity : parseInt(v, 10);
+  flatViewOrder = null;  // re-sort flat view with new filter
+  renderTable();
 });
 $('#btn-back').addEventListener('click', () => { drillDown = null; drillDownOrder = null; renderTable(); });
 $('#breadcrumb').addEventListener('click', e => {
@@ -2721,6 +2888,7 @@ $('#breadcrumb').addEventListener('click', e => {
 function updateViewToggle() {
   $('#btn-view-room').classList.toggle('active', viewMode === 'room');
   $('#btn-view-task').classList.toggle('active', viewMode === 'tasktype');
+  $('#btn-view-flat').classList.toggle('active', viewMode === 'flat');
 }
 
 // ── Room Dialog ──────────────────────────────────────────────
@@ -3275,7 +3443,7 @@ $('#settings-reset').addEventListener('click', () => {
   }
   if (confirm(msg)) {
     DATA = defaultData();
-    drillDown = null; drillDownOrder = null; viewMode = 'room';
+    drillDown = null; drillDownOrder = null; flatViewOrder = null; viewMode = 'room';
     applyTheme();
     save(); renderTable(); renderUsers(); renderUserDialogList(); renderHistory(); updateViewToggle();
     $('#settings-dialog').close();

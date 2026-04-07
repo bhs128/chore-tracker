@@ -9,7 +9,9 @@ A single-page, open-source household chore dashboard designed for always-on tabl
 ### Core
 
 - **Touch-first kiosk UI** — landscape, no-scroll, fullscreen-friendly with 44px minimum tap targets
-- **Dual-view grid** — switch between **🏠 Room View** (one row per room) and **📋 Task View** (one row per task type, aggregated across rooms)
+- **Dual-view grid** — switch between **🏠 Room View** (one row per room), **📋 Task View** (one row per task type, aggregated across rooms), and **📝 Ungrouped View** (flat list of every task, sorted by urgency)
+- **Ungrouped view** — shows every task as its own row with bold task name, room as subtitle, and cycle length inline; sorted most-overdue-first with a stable sort order (rows don't jump when you check them off)
+- **Due-date filter** — dropdown to filter all views by urgency: show all tasks, due within 7 days, due within 3 days, due today, or overdue only; when all tasks are filtered out, a "🎉 You're all caught up!" message replaces the grid
 - **Drill-down navigation** — tap aggregate cells or row headers to see individual tasks within a room, or individual rooms for a task type; navigate back with the ← breadcrumb bar
 - **Per-room task definitions** — each room can have named tasks (e.g. "Vacuum", "Sweep/Mop"), each with its own independent clean cycle; rooms without tasks use simple single-tap toggle
 - **Task type aggregation** — tasks with the same name across different rooms are automatically merged in Task View (e.g. all "Vacuum" tasks appear as one row showing completion across rooms)
@@ -40,7 +42,7 @@ A single-page, open-source household chore dashboard designed for always-on tabl
 ### Users & Settings
 
 - **User selection** — tap a name chip in the top bar before checking off a chore; cells show computed shortest-unique prefixes to distinguish users
-- **User management** — add/remove users from the settings panel
+- **User management** — add/remove users via a dedicated dialog (click 👤 icon in the top bar)
 - **Dark & Light themes** — toggle in settings; all colors adapt via CSS custom properties
 - **Import / Export** — back up and restore all data as a JSON file
 - **Reset All** — wipe all data and restore defaults from the settings panel
@@ -50,6 +52,9 @@ A single-page, open-source household chore dashboard designed for always-on tabl
 - **PWA / Installable** — manifest + service worker for "Add to Home Screen" and full offline support
 - **Offline-first** — all data lives in `localStorage` by default; nothing leaves your browser unless you opt in to sync
 - **Optional multi-device sync** — point any number of browsers at a lightweight Python sync server to share data across tablets/phones on the same network, with real-time WebSocket push updates
+- **Version conflict resolution** — server detects stale writes via `X-Base-Version` header; clients automatically merge and retry on 409 Conflict
+- **Sync changelog** — server records a changelog of all data changes (checked/unchecked/reassigned tasks, added/removed rooms and users) with per-entry rollback and prune support
+- **Connection status dialog** — click the sync indicator to see current mode, server version, WebSocket state, last sync time, and run a multi-layer connectivity test
 - **Zero dependencies** — single HTML file, no build step, no frameworks
 - **Self-hosted Poppins font** — three weights (400/600/700) bundled as woff2 for offline use
 - **Auto-refresh** — table and history chart re-render every 60 seconds to handle day rollover
@@ -101,7 +106,10 @@ python3 server/server.py --static ''             # sync-only, no static file ser
 **Architecture:**
 - `GET /` — serves `index.html` and all static assets (HTML, JS, fonts, icons, manifest)
 - `GET /data` — fetch the full data blob (REST)
-- `PUT /data` — save the full data blob; server stamps a `_version` field (REST)
+- `PUT /data` — save the full data blob; server stamps a `_version` field; returns 409 Conflict with server data if `X-Base-Version` is stale (REST)
+- `GET /changelog` — fetch the sync changelog (REST)
+- `DELETE /changelog/<ts>` — prune a specific changelog entry (REST)
+- `POST /changelog/rollback` — undo a changelog entry's changes (REST)
 - `ws://<host>:<port+1>` — server broadcasts `data-changed` to all connected clients on every PUT
 - Clients write to localStorage immediately (instant UI), then push to the server in the background
 - Each device's selected user and theme are kept local (not synced)
@@ -119,13 +127,16 @@ For kiosk mode:
 2. **Add tasks to a room** — in the room editor, add named tasks (e.g. "Vacuum", "Mop") with individual clean cycles; autocomplete suggests task names used in other rooms and auto-fills the most common cycle length
 3. **Add users** — open ⚙ Settings, type a name and press Enter or "+"
 4. **Select yourself** — tap your name chip in the top bar (highlighted with a blue border)
-5. **Switch views** — use the 🏠 / 📋 toggle to switch between Room View and Task View
-6. **Mark chores done** — tap a cell in the grid; for rooms with tasks, tap aggregate cells to drill down, then check off individual tasks
+5. **Switch views** — use the 🏠 / 📋 / 📝 toggle to switch between Room View, Task View, and Ungrouped View
+6. **Filter by urgency** — use the "Show:" dropdown to filter tasks by how soon they're due
+7. **Mark chores done** — tap a cell in the grid; for rooms with tasks, tap aggregate cells to drill down, then check off individual tasks; in Ungrouped View, tap cells directly
 7. **Tap again to undo** — toggle off a mistaken entry
 8. **Drill down** — tap a room name (Room View) or task type name (Task View) to see the breakdown; tap ← Back to return
 9. **Adjust settings** — click ⚙ to change visible days, history range, color theme, or import/export data
 10. **Review progress** — tap 📊 Review in the top bar to open the full-width dashboard with hero stats, activity heatmap, hit list, leaderboards, and room health cards
-11. **Install as app** — use your browser's "Add to Home Screen" or "Install App" option for a standalone kiosk experience
+11. **View sync changelog** — tap 📜 to see a timestamped log of all synced changes with rollback/prune options
+12. **Check connection** — tap the sync status indicator to see connection details and run a diagnostic test
+13. **Install as app** — use your browser's "Add to Home Screen" or "Install App" option for a standalone kiosk experience
 
 ## Project Structure
 
@@ -137,7 +148,10 @@ fonts/           — self-hosted Poppins woff2 (400, 600, 700)
 icons/           — PWA & favicon icons (16, 32, 192, 512, maskable-512)
 server/          — optional sync server for multi-device use
   server.py      — REST + WebSocket + static file server (Python 3, one dependency)
+  test_server.py — pytest test suite for the sync server
   chore-tracker.service — systemd unit file for auto-start on boot
+.github/         — CI configuration
+  workflows/test.yml — GitHub Actions: runs server test suite on push/PR
 LICENSE          — MIT license
 README.md        — this file
 ```
@@ -172,7 +186,7 @@ All data is stored in `localStorage` under the key `chore-tracker-data`:
       }
     }
   },
-  "settings": { "daysShown": 14, "historyDays": 30, "theme": "dark" },
+  "settings": { "pastDays": 3, "futureDays": 10, "historyDays": 30, "theme": "dark" },
   "selectedUser": "Alice"
 }
 ```
