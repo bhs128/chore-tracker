@@ -262,7 +262,7 @@ def write_data(body: str, client_id: str = "", client_label: str = "",
     )
     struct_changes = _compute_structure_diff(current, obj)
 
-    obj["_version"] = int(time.time() * 1000)
+    obj["_version"] = max(int(time.time() * 1000), current_version + 1)
     # Write to a temp file then atomically rename to avoid corruption
     dir_name = os.path.dirname(os.path.abspath(data_file)) or "."
     fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
