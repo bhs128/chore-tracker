@@ -502,11 +502,13 @@ class RESTProtocol(asyncio.Protocol):
             # Resolve and ensure it stays inside static_root
             requested = Path(static_root, rel).resolve()
             root = Path(static_root).resolve()
-            if str(requested).startswith(str(root)) and requested.is_file():
+            if requested.is_relative_to(root) and requested.is_file():
                 try:
                     content = requested.read_bytes()
                     ct = guess_mime(str(requested))
-                    self._respond(200, content, content_type=ct, extra_headers=CORS_HEADERS)
+                    # Tablets must pick up app updates without a hard refresh
+                    headers = CORS_HEADERS + (("Cache-Control", "no-cache"),)
+                    self._respond(200, content, content_type=ct, extra_headers=headers)
                     return
                 except OSError:
                     pass

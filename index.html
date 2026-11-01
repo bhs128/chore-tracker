@@ -576,8 +576,10 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
 
 /* Two-column grids */
 .review-grid-2 {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;
 }
+.review-grid-2 > .review-section { margin-bottom: 0; }
+.review-grid-2 > .review-section.collapsed { align-self: start; }
 .review-grid-today {
   display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start;
 }
@@ -689,10 +691,25 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
   content: ''; flex: 1; height: 1px; background: var(--sep-color);
 }
 
+/* Monthly coverage */
+.cov-chart { display: flex; align-items: flex-end; justify-content: center; gap: 14px; height: 150px; margin-bottom: 14px; }
+.cov-col { flex: 1; max-width: 90px; height: 100%; display: flex; flex-direction: column; align-items: center; }
+.cov-pct { font-size: .78rem; font-weight: 700; margin-bottom: 4px; }
+.cov-bar-wrap { width: 100%; flex: 1; display: flex; align-items: flex-end; background: var(--head-bg); border-radius: 6px; overflow: hidden; }
+.cov-bar { width: 100%; transition: height .4s ease; }
+.cov-month { font-size: .7rem; color: var(--desc-text); margin-top: 4px; text-align: center; line-height: 1.2; height: 2.4em; }
+.review-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-items: start; }
+.cov-tile { background: var(--head-bg); border-radius: 8px; padding: 10px; }
+.cov-tile-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; font-size: .82rem; }
+.cov-tile-head span { font-size: .68rem; color: var(--desc-text); }
+.cov-tile .hit-list { max-height: 280px; overflow-y: auto; }
+.cov-tile .hit-list li { padding: 5px 4px; margin-bottom: 2px; border-bottom: 1px solid var(--bar-border); border-radius: 0; }
+.cov-tile .all-clean { padding: 12px; font-size: .8rem; }
+
 /* ── Review responsive: tablet ─────────────────────────────── */
 @media (max-width: 768px) {
   .hero-stats { grid-template-columns: repeat(2, 1fr); }
-  .review-grid-2, .review-grid-today { grid-template-columns: 1fr; }
+  .review-grid-2, .review-grid-today, .review-grid-3 { grid-template-columns: 1fr; }
   .lb-breakdown { display: none; }
   .heatmap-cell { font-size: 0; } /* hide numbers, keep colored squares */
   .heatmap-user-label { font-size: .56rem; }
@@ -1716,11 +1733,16 @@ function itemDaysUntilDue(room, task) {
   const info = cellInfo(room, today());
   return info.daysSince === 999 ? -999 : room.cleanDays - (info.daysSince ?? 0);
 }
+// Entries older than this are deleted by gc()
+function historyFloor() { return addDays(today(), -730); }
+function itemDoneOn(room, task, d) {
+  const e = DATA.entries[d]?.[room.id];
+  return !!(task ? e?.tasks?.[task.id]?.cleaned : e?.cleaned);
+}
 function doneThisMonth(room, task) {
   const t = today();
   for (let d = getFirstOfMonth(t); d <= t; d = addDays(d, 1)) {
-    const e = DATA.entries[d]?.[room.id];
-    if (task ? e?.tasks?.[task.id]?.cleaned : e?.cleaned) return true;
+    if (itemDoneOn(room, task, d)) return true;
   }
   return false;
 }
@@ -2019,6 +2041,52 @@ function computeReviewData() {
   };
 }
 
+function monthCoverage(first) {
+  const t = today(), floor = historyFloor();
+  const d0 = new Date(first + 'T12:00:00');
+  const last = dateStr(new Date(d0.getFullYear(), d0.getMonth() + 1, 0, 12));
+  const end = last < t ? last : t;
+  const items = allAtomicItems();
+  const missed = [];
+  for (const { room, task } of items) {
+    let doneInMonth = false;
+    for (let d = first; d <= end; d = addDays(d, 1)) {
+      if (itemDoneOn(room, task, d)) { doneInMonth = true; break; }
+    }
+    if (doneInMonth) continue;
+    // Days since last done, counted back from the month's end; null if no record before the history floor
+    let daysSince = null, i = 0;
+    for (let d = end; d >= floor; d = addDays(d, -1), i++) {
+      if (itemDoneOn(room, task, d)) { daysSince = i; break; }
+    }
+    missed.push({
+      task: task ? task.label : room.name, room: task ? room.name : '',
+      cleanDays: task ? task.cleanDays : room.cleanDays, daysSince, searched: i,
+    });
+  }
+  missed.sort((a, b) => (b.daysSince ?? 1e9) - (a.daysSince ?? 1e9));
+  const total = items.length;
+  return {
+    first, partial: end < last, missed, total,
+    pct: total ? Math.round((total - missed.length) / total * 100) : 100,
+    name: d0.toLocaleDateString(undefined, { month: 'long' }),
+    short: d0.toLocaleDateString(undefined, { month: 'short' }),
+  };
+}
+
+// Newest month first; skips months before the first recorded check-off
+function monthlyCoverage() {
+  const oldest = Object.keys(DATA.entries).sort()[0] || today();
+  const start = getFirstOfMonth(oldest > historyFloor() ? oldest : historyFloor());
+  const months = [];
+  let f = getFirstOfMonth(today());
+  do {
+    months.push(monthCoverage(f));
+    f = getFirstOfMonth(addDays(f, -1));
+  } while (f >= start && months.length < 12);
+  return months;
+}
+
 function renderReview() {
   const data = computeReviewData();
   const p = getPalette();
@@ -2299,6 +2367,54 @@ function renderReview() {
   html += renderPeriodCard('\ud83d\udcc6 ' + data.thisMonthName, data.thisMonth, false);
   html += renderPeriodCard('\ud83d\udcc4 ' + data.lastMonthName, data.lastMonth, true);
   html += '</div>';
+
+  // ── MONTHLY COVERAGE ──
+  const months = monthlyCoverage();
+  const pctColor = pct => pct >= 80 ? cleanClr : pct >= 50 ? 'var(--accent)' : dirtyClr;
+  html += '<div class="review-section">';
+  html += '<div class="review-section-header" data-review-toggle><h4>\ud83d\uddd3\ufe0f Monthly Coverage</h4><span class="review-toggle">\u25bc</span></div>';
+  html += '<div class="review-section-body">';
+  html += '<div class="review-sub-label">Tasks done at least once each month</div>';
+  html += '<div class="cov-chart">';
+  for (const m of [...months].reverse()) {
+    const done = m.total - m.missed.length;
+    html += `<div class="cov-col" title="${m.name}${m.partial ? ' (so far)' : ''}: ${done} of ${m.total} tasks done at least once">`;
+    html += `<span class="cov-pct" style="color:${pctColor(m.pct)}">${m.pct}%</span>`;
+    html += `<div class="cov-bar-wrap"><div class="cov-bar" style="height:${m.pct}%;background:${pctColor(m.pct)}"></div></div>`;
+    html += `<span class="cov-month">${m.short}${m.partial ? '<br>so far' : ''}</span>`;
+    html += '</div>';
+  }
+  html += '</div>';
+
+  html += '<div class="review-sub-label">Not done at all \u2014 longest gap first</div>';
+  html += '<div class="review-grid-3">';
+  for (const m of months.slice(0, 3).reverse()) {
+    const asOf = m.partial ? 'today' : `the end of ${m.name}`;
+    html += '<div class="cov-tile">';
+    html += `<div class="cov-tile-head"><strong>${m.name}${m.partial ? ' (so far)' : ''}</strong><span>${m.missed.length} of ${m.total} not done</span></div>`;
+    if (m.missed.length === 0) {
+      html += '<div class="all-clean"><span class="all-clean-emoji">\ud83c\udf89</span>Every task done at least once!</div>';
+    } else {
+      html += '<ul class="hit-list">';
+      for (const x of m.missed) {
+        const ratio = x.daysSince == null ? 3 : x.daysSince / (x.cleanDays || 1);
+        const label = x.daysSince == null ? `${x.searched}+d` : `${x.daysSince}d`;
+        const tip = x.daysSince == null
+          ? `No record in the last ${x.searched} days before ${asOf}`
+          : `Last done ${x.daysSince} days before ${asOf} (cycle: ${x.cleanDays}d)`;
+        html += '<li>';
+        html += `<span class="hit-detail"><span class="hit-task">${esc(x.task)}</span>`;
+        if (x.room) html += `<span class="hit-room"> \u2014 ${esc(x.room)}</span>`;
+        html += '</span>';
+        html += `<span class="hit-overdue" style="background:${cellColor(ratio, false)};color:${cellTextColor(ratio)}" title="${tip}">${label}</span>`;
+        html += '</li>';
+      }
+      html += '</ul>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  html += '</div></div>'; // end monthly coverage section
 
   $('#review-content').innerHTML = html;
 
@@ -3721,9 +3837,9 @@ $('#table-foot').addEventListener('pointerover', e => {
 });
 $('#table-foot').addEventListener('pointerleave', () => { clearTip(); });
 
-// ── Garbage-collect old entries (> 120 days) ─────────────────
+// ── Garbage-collect old entries (> 2 years) ─────────────────
 function gc() {
-  const cutoff = addDays(today(), -120);
+  const cutoff = historyFloor();
   for (const d of Object.keys(DATA.entries)) {
     if (d < cutoff) delete DATA.entries[d];
   }

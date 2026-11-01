@@ -193,7 +193,7 @@ All data is stored in `localStorage` under the key `chore-tracker-data`:
 
 - Rooms without a `tasks` array (or with an empty one) use simple single-tap toggle and store only `{ cleaned, user }` in entries.
 - Rooms with tasks store per-task completion under `entries[date][roomId].tasks[taskId]`.
-- Old entries (>120 days) are automatically garbage-collected on load.
+- Old entries (>2 years) are automatically garbage-collected on load.
 
 ## Feature Roadmap
 
