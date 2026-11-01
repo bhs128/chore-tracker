@@ -175,7 +175,7 @@ button.primary:hover { opacity: .85; }
 }
 #chore-table thead th.today { color: var(--today-text); background: var(--today-bg); font-weight: 700; }
 /* Date navigation arrows */
-#chore-table thead th.date-nav { cursor: pointer; position: relative; }
+#chore-table thead th.date-nav { cursor: pointer; }
 #chore-table thead th.date-nav::after {
   content: ''; position: absolute; top: 50%; transform: translateY(-50%);
   width: 0; height: 0; opacity: .35; pointer-events: none;
@@ -226,7 +226,7 @@ td.cell-future  { background: var(--future-bg); color: var(--future-text); }
   position: sticky; left: 0; bottom: 0; z-index: 3;
 }
 /* Progress row (done/due) — colors set inline from palette */
-.foot-net-zero { opacity: .5; }
+.foot-net-zero { color: var(--desc-text) !important; }
 
 /* ── Row sort animation ────────────────────────────────────── */
 #chore-table tbody tr {
@@ -751,6 +751,7 @@ td.cell-aggregate { font-size: .65rem; font-weight: 700; }
       <option value="3">Show: Due within 3 days</option>
       <option value="0">Show: Due today</option>
       <option value="-1">Show: Overdue only</option>
+      <option value="month" id="due-filter-month">Show: Not yet done this month</option>
     </select>
 
     <div class="tb-sep"></div>
@@ -1291,7 +1292,7 @@ let drillDown = null;        // null | { type:'room', roomId } | { type:'tasktyp
 let drillDownOrder = null;   // cached sort order for drill-down (prevents re-sort on toggle)
 let flatViewOrder = null;    // cached sort order for flat view (prevents re-sort on cell toggle)
 let dateOffset = 0;          // shift visible date window (negative = past, positive = future)
-let dueFilter = Infinity;    // max days-until-due to show (Infinity = all, 7, 3, 0, -1)
+let dueFilter = Infinity;    // max days-until-due to show (Infinity = all, 7, 3, 0, -1), or 'month'
 
 // ── Task Helpers ─────────────────────────────────────────────
 function roomHasTasks(room) { return room.tasks && room.tasks.length > 0; }
@@ -1715,9 +1716,22 @@ function itemDaysUntilDue(room, task) {
   const info = cellInfo(room, today());
   return info.daysSince === 999 ? -999 : room.cleanDays - (info.daysSince ?? 0);
 }
+function doneThisMonth(room, task) {
+  const t = today();
+  for (let d = getFirstOfMonth(t); d <= t; d = addDays(d, 1)) {
+    const e = DATA.entries[d]?.[room.id];
+    if (task ? e?.tasks?.[task.id]?.cleaned : e?.cleaned) return true;
+  }
+  return false;
+}
 function passesDueFilter(room, task) {
   if (dueFilter === Infinity) return true;
+  if (dueFilter === 'month') return !doneThisMonth(room, task);
   return itemDaysUntilDue(room, task) <= dueFilter;
+}
+function updateMonthFilterLabel() {
+  const month = new Date(today() + 'T12:00:00').toLocaleDateString(undefined, { month: 'short' });
+  $('#due-filter-month').textContent = `Show: Not yet done in ${month}`;
 }
 
 // ── Review Feature ───────────────────────────────────────────
@@ -2302,6 +2316,7 @@ function renderTable(animate) {
   const t = today();
   const prefixes = userPrefixes();
 
+  updateMonthFilterLabel();
   renderTableHead(dates, t);
   updateBackBar();
 
@@ -2321,8 +2336,19 @@ function renderTable(animate) {
   else if (viewMode === 'room') renderRoomView(dates, t, prefixes, animate);
   else renderTaskTypeView(dates, t, prefixes);
 
+  stackFooterRows();
   const todayTh = $('#table-head th.today');
   if (todayTh) todayTh.scrollIntoView({ inline: 'center', block: 'nearest' });
+}
+
+// Sticky tfoot rows all default to bottom:0 and overlap; offset each by the rows below it
+function stackFooterRows() {
+  const rows = [...$('#table-foot').rows];
+  let offset = 0;
+  for (let i = rows.length - 1; i >= 0; i--) {
+    for (const cell of rows[i].cells) cell.style.bottom = offset + 'px';
+    offset += rows[i].getBoundingClientRect().height;
+  }
 }
 
 function renderTableHead(dates, t) {
@@ -2875,7 +2901,7 @@ $('#btn-view-flat').addEventListener('click', () => {
 });
 $('#due-filter').addEventListener('change', (e) => {
   const v = e.target.value;
-  dueFilter = v === 'Infinity' ? Infinity : parseInt(v, 10);
+  dueFilter = v === 'Infinity' ? Infinity : v === 'month' ? 'month' : parseInt(v, 10);
   flatViewOrder = null;  // re-sort flat view with new filter
   renderTable();
 });
